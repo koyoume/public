@@ -28,316 +28,17 @@
 
 ## 논리 설계
 
-> 마지막 업데이트: 2026-03-18 | 완료 챕터: Chap 1.1, 1.2, 2, 3.1, 3.2, 6.1(K-map)
-
----
-
-### Chap 1.1 — 디지털 추상화 (Digital Abstraction)
-
-**핵심 개념**
-- 디지털 추상화 동기: 아날로그 노이즈 누적 문제 → 이진 신호 + 복원 메커니즘으로 해결
-- 신호 복원(Signal Restoration): 게이트 통과 시 노이즈 마진 내 노이즈 자동 제거
-
-**전압 파라미터** (2.5V LVCMOS 기준)
-- V_OL=0.2V, V_IL=0.7V → V_NML = V_IL - V_OL = 0.5V (Low 노이즈 마진)
-- V_OH=2.1V, V_IH=1.7V → V_NMH = V_OH - V_IH = 0.4V (High 노이즈 마진)
-- Forbidden Zone: V_IL ~ V_IH (입력 미정의 구간)
-- DC Transfer Curve: 입력→출력 전압 관계 곡선, 신호 복원 조건 만족 필수
-
-**정보 표현 원칙**
-- 수행할 연산(Operation)에 맞는 인코딩 선택
-- 예) 감산 혼색 → OR 연산으로 구현
-
-**회로 분류**
-- 조합 논리(Combinational): 출력 = f(현재 입력만), 메모리 없음
-- 순차 논리(Sequential): 출력 = f(현재 입력 + 이전 상태), 레지스터 필요
-
----
-
-### Chap 1.2 — 디지털 논리 함수 (Logic Functions)
-
-**핵심 개념**
-- Combinational: 출력 = f(현재 입력), 메모리/클럭 없음, 피드백 없음
-- Sequential: 출력 = f(현재 입력 + 이전 상태), 레지스터+클럭 필요, 피드백 있음
-
-**Verilog 기초**
-- `wire` + `assign`: 조합 논리 (Continuous Assignment - 입력 바뀌면 즉시 반영)
-- `reg` + `always @(posedge clk)`: 순차 논리
-- `wire fanOn = expr` ≡ `wire fanOn; assign fanOn = expr` ≡ `assign fanOn = expr` (합성 결과 동일)
-- Continuous Assignment: 항상 연결된 wire 표현, 입력 변화 즉시 반영
-- Simulation(기능 검증) vs Synthesis(하드웨어 변환) 두 가지 목적
-
-**Verilog Synthesis 단계**
-- Transform: RTL → 기술 독립적 게이트 변환 (Elaboration → Generic Synthesis → Technology Mapping)
-- Optimize: 제약조건(Timing/Area/Power) 만족하도록 게이트 개선
-- Behavioral Description: 동작 기술, 합성 불가 코드 포함 가능, 시뮬레이션용
-- RTL Description: 클럭 단위 레지스터 전송 기술, 합성 가능
-
----
-
-### Chap 2 — 설계 플로우 (Design Flow)
-
-**칩 기본 구조**
-- Wafer → Die → Chip 계층
-- Devices: Transistors → Logic Gates & Cells → Function Blocks
-- Interconnects: Local signals / Global signals / Clock signals / Power·Ground nets
-- ASIC(위치 제한 없음, 최대 성능) vs FPGA(위치 한정, 단시간 설계)
-
-**설계 Flow ★**
-- Spec → System Design → 아키텍처 Design → RTL/Logic Design → HW Implementation → 통합 평가
-- HW/SW partitioning: System 단계에서 결정
-- High-level synthesis vs RTL synthesis 차이: clock step scheduling 여부
-- Logic 최적화 단계: wire 지연 = 0 가정
-- Physical Design: Placement(블록 위치) + Routing(배선 경로)
-
-**Physical Design 배치 순서**
-- Floorplanning → PDN 배선 → Placement → CTS(CDN) → Signal Routing → RC Extraction → Verification
-
-**PDN / CDN / Metal Layer**
-- Metal Layer: 높은 층 = 두껍고 저항 작음 = 전원/글로벌용, 낮은 층 = 얇고 로컬 신호용
-- Via: 층간 수직 연결
-- PDN(Power Delivery Network): Grid 구조, IR Drop / Ground Bounce 최소화 목표
-- CDN(Clock Distribution Network): H-Tree 구조, Clock Skew 최소화 목표
-- Signal Routing: 수평/수직 교대 Metal Layer 배정 (Crosstalk 최소화)
-
-**신호 지연 R, C**
-- R, C는 기생 성분(Parasitic) — 의도하지 않았지만 물리적으로 불가피
-- R: 금속 배선 고유 저항 → 전압 강하(레벨 문제)
-- C: 배선-기판/배선-배선 커패시터 → 충방전 지연(타이밍 문제)
-- RC 지연 τ = R × C
-
-**Power / Signal Integrity**
-- Power Integrity: IR Drop, Power Grid Noise, Ground Bounce → 전원 안정 공급 문제
-- Signal Integrity: RC 지연, Crosstalk, Reflection, EMI → 신호 파형 왜곡 문제
-- 해결: 버퍼 삽입, Decoupling Capacitor, 배선 강화, Low-k 유전체
-
-**DFT / Testing / Verification**
-- Verification: 제조 전 설계 오류 찾기 (Simulation, Formal Verification, Emulation)
-- Testing: 제조 후 불량 칩 선별
-- DFT(Design For Testability): Controllability + Observability 높이는 설계 방법론
-- Scan: FF들을 체인으로 연결 → 내부 상태 직렬 읽기/쓰기
-- BIST(Built-In Self Test): LFSR(패턴 생성) + MISR(결과 압축) → 자가진단
-
-**PPA & Timing**
-- PPA: Power / Performance / Area — 항상 트레이드오프
-- Slack = t_cy - (t_dCQ + t_dMax + t_s), Slack > 0이면 타이밍 통과
-- Worst Gate Slack: 칩 전체에서 가장 작은 Slack
-- f_effective = 1 / (T_target - Worst_Slack)
-- Setup: t_cy > t_dCQ + t_dMax + t_s
-- Hold: t_h < t_cCQ + t_cMin (클럭 주기와 무관, 어떤 속도에서도 위험)
-
-**RTL 설계**
-- RTL = Register Transfer Level: 클럭 단위로 레지스터 간 데이터 전송 기술
-- Datapath 방식: 상태를 테이블 대신 수식으로 표현 (next = rst ? 0 : state + 1)
-- Counter: next = rst ? 0 : state + 1
-- Shift Register: next = rst ? 0 : {state[n-2:0], sin}
-- Control/Datapath 분리: FSM(제어) + Datapath(연산) 역할 분담
-- Status Signals: Datapath → Control, Control Signals: Control → Datapath
-
-**Inverter × N (Drive Strength)**
-- N배 크기 인버터: 트랜지스터 폭 N배 → 전류 N배, 출력저항 1/N배
-- 입력 C도 N배 증가 → 앞단에 부담
-- Buffer Chain: 단계적으로 크기 키우기 (3~4배씩) → 최적 지연
-- 사용처: 큰 Fanout, 긴 배선 구동, Clock 분배
-
----
-
-### Chap 3.1 — 불 대수 공리와 정리 (Boolean Algebra: Axioms & Theorems)
-
-**기본 연산자**
-- AND(·): 둘 다 1일 때만 1
-- OR(+): 하나라도 1이면 1
-- NOT('): 반전, 연산자 우선순위: NOT > AND > OR
-
-**공리 (Axioms) — 증명 없이 참**
-- Identity: 1·x=x, 0+x=x
-- Annihilation: 0·x=0, 1+x=1
-- Negation: 0'=1, 1'=0
-
-**주요 성질 (Properties) ★**
-
-| 이름 | AND 버전 | OR 버전 |
-|------|---------|---------|
-| Complementation | x·x'=0 | x+x'=1 |
-| Idempotence | x·x=x | x+x=x |
-| Absorption | x·(x+y)=x | x+(x·y)=x |
-| Combining ★ | (x·y)+(x·y')=x | (x+y)·(x+y')=x |
-| DeMorgan ★★ | (x·y)'=x'+y' | (x+y)'=x'·y' |
-| Consensus | (x·y)+(x'·z)+(y·z)=(x·y)+(x'·z) | |
-| Distributive (특수) | x+(y·z)=(x+y)·(x+z) | ← 일반 수학과 다름! |
-
-**Duality (쌍대)**
-- AND↔OR, 0↔1 교환 시 모든 정리 성립
-- 정리 증명 수를 절반으로 줄임
-
-**로직 함수 표현 5가지 & 유일성**
-- English: 모호, 비유일
-- Boolean Expression: 수학적, 비유일
-- Truth Table: 완전, **유일 ✅**, 크기 2^n
-- Schematic: 구현용, 비유일
-- BDD(Binary Decision Diagram): **유일 ✅**(변수 순서 고정 시), 효율적
-- ROBDD = Reduced Ordered BDD: 등가 검증에 핵심 자료구조
-
----
-
-### Chap 3.2 — Normal Forms, Logic Diagram, Verilog
-
-**Normal Form (정규형)**
-- SoP(Sum of Products): AND항들을 OR로 연결
-- Canonical SoP: 모든 항이 모든 변수 포함 → **유일 ✅**
-- Minterm(mₙ): 모든 변수가 정확히 한 번 등장하는 AND항
-- f = Σm(출력=1인 행 번호) 표기법
-- 번호 규칙: 입력값을 이진수로 읽은 것 (a=1,b=0,c=1 → 101₂ = 5 → m₅)
-
-**Shannon Expansion**
-- f(a,b,c) = a'·f(0,b,c) + a·f(1,b,c)
-- 반복 적용 → Canonical SoP 자동 생성
-
-**수식 → 게이트 변환**
-- SoP → 2단 AND-OR 회로 (1단: AND 게이트, 2단: OR 게이트)
-- AND-OR → NAND-NAND: 드모르간 적용, 기능 동일, 트랜지스터 효율적
-- Bubble Rule: 버블(○) 두 개 만나면 상쇄 (이중 반전 = 반전 없음)
-- NAND-NAND = AND-OR (버블 규칙으로 증명)
-
-**XOR**
-- a⊕b = a'b + ab' (둘이 다를 때 1)
-- a⊕1 = a' → 제어 가능 인버터
-- a⊕0 = a, a⊕a = 0, a⊕a' = 1
-- NAND 4개로 구현 가능
-
-**AOI / OAI (Complex Gates)**
-- AOI(AND-OR-Inverter): f = (AND그룹들의 OR)' → Pull-Down: AND직렬·그룹병렬
-- OAI(OR-AND-Inverter): f = (OR그룹들의 AND)' → Pull-Down: OR병렬·그룹직렬
-- 명명법: AOI22 = AND(2)·OR·AND(2)·INV, OAI13 = OR(1)·AND·OR(3)·INV
-- 최적화 효과: 트랜지스터 ~50% 감소, 게이트 단수 3단→1단
-
-**Verilog**
-- &(AND), |(OR), ~(NOT), ^(XOR), ~^(XNOR)
-- assign f = 불표현식 → 합성기 자동 최적화
-
----
-
-### Chap 6.1 — 카르노 맵 (Karnaugh Map)
-
-**K-map 원리**
-- Combining 정리 시각화 도구: 인접 Minterm 묶기 = 변수 제거
-- Gray Code 배열: 인접 칸은 항상 1비트만 다름 → Combining 적용 가능
-- 가장자리 Wrap-around: 상하/좌우 연결 (토로이드 구조)
-
-**Implicant & Cube**
-- Implicant: 출력=1을 만드는 입력 조합 집합
-- k-cube: 2^k개 Minterm 묶음, 변수 k개 제거됨
-- X 표기: 제거된 변수 (Don't care)
-- 묶음 클수록 → 항 단순 → 게이트 입력 수 감소
-
-**묶음 규칙**
-- 크기: 반드시 2의 거듭제곱 (1, 2, 4, 8, ...)
-- 모양: 직사각형
-- 전략: 가능한 한 크게 묶기
-
-**Prime Implicant (PI) & Essential PI**
-- PI: 더 이상 크게 묶을 수 없는 최대 크기 Implicant
-- Essential PI: 특정 Minterm을 오직 하나의 PI로만 커버 → 반드시 선택
-- 최소 SoP 절차: PI 찾기 → Essential PI 선택 → 나머지 최소 커버
-
-**Canonical SoP → Simplified SoP 관계**
-- Canonical: 모든 Minterm 나열, 유일하지만 복잡
-- K-map: 인접 Minterm 합쳐서 항 수·리터럴 수 최소화
-- 결과: Simplified SoP → 최소 게이트 구현
-- CAD 도구는 멀티레벨 회로까지 고려해 더 잘 최적화
-
----
-
 ### 조합 논리
-<!-- MUX, 디코더, 인코더, ALU - 추후 업데이트 -->
+<!-- 불 대수, 카르노 맵, MUX, 디코더, ALU -->
 
 ### 순차 논리
-
-#### Chap 10 — Latch & Flip-flop
-
-**진화 흐름 ★**
-- RS Latch → Gated Latch → Master-Slave FF → D Flip-flop
-- 각 단계마다 이전 소자의 문제를 해결
-
-**RS Latch**
-- 피드백 구조(NOR×2)로 기억 가능
-- S=1→Q=1(Set), R=1→Q=0(Reset), SR=00→Hold, SR=11→불안정(사용 금지)
-
-**Gated Latch (Level-Sensitive Latch)**
-- Enable=1인 동안만 S, R 동작
-- Level-Sensitive: Enable High 레벨 동안 입력 변화가 즉시 출력에 반영
-- 문제: Transparency — Enable=1 동안 입력이 출력에 계속 투명하게 보임
-
-**Master-Slave Flip-flop**
-- Master(CLK=1에 열림) + Slave(CLK=0에 열림) 직렬 구성
-- Transparency 해결: 한 번에 하나씩만 열림
-- Falling-edge triggered (하강 엣지 트리거)
-- 문제: 1's Catching — CLK=1 동안 글리치(0-1-0)가 Master에 포착됨
-
-**D Flip-flop ★★ (현재 표준)**
-- S=D, R=D' 강제 → SR=11 불가 → 1's Catching 해결
-- Rising-edge triggered (상승 엣지 트리거)
-- 동작: 클럭 상승 엣지 직전의 D값이 Q로 저장
-- Positive/Negative edge-triggered FF 트랜지스터 수 동일 (CLK↔CLK' 교환)
-
-**타이밍 파라미터 3가지 ★★★**
-- Tsu (Setup Time): 클럭 엣지 전 D가 안정되어야 하는 최소 시간 (예: 1.8ns)
-- Th (Hold Time): 클럭 엣지 후 D가 유지되어야 하는 최소 시간 (예: 0.5ns)
-- Tc2q (Clock-to-Q): 클럭 엣지 후 Q 출력 안정까지 지연 (예: 1.1ns)
-- 위반 시 → Metastability 발생 가능
-
-**Latch vs Flip-flop 핵심 차이 ★**
-- Latch: Level-sensitive, Enable=1 동안 투명(계속 반응)
-- FF: Edge-triggered, 엣지 순간만 캡처 (투명성 없음)
-
-**FF 전력 소모가 큰 이유**
-- 클럭 자체 스위칭 전력 (칩 전체 전력의 20~40%)
-- 매 클럭마다 FF 내부 노드 충전/방전 (값 안 바뀌어도 동작)
+<!-- 플립플롭, 레지스터, 카운터, 시프트 레지스터 -->
 
 ### 상태 머신
-<!-- Mealy vs Moore, 상태 최소화, 인코딩 - 추후 업데이트 -->
+<!-- Mealy vs Moore, 상태 최소화, 인코딩 -->
 
 ### 타이밍 분석
-
-#### Chap 15 — Timing Constraints
-
-**두 가지 지연 개념 ★**
-- Propagation Delay (t_d): 입력 완전 안정 → 출력 완전 안정 (최악, Critical Path)
-- Contamination Delay (t_c): 입력 첫 변화 → 출력 첫 변화 (최선, 가장 빠른 경로)
-- 항상 t_c ≤ t_d
-- t_d: "언제부터 출력을 믿을 수 있나?" → Setup에 사용
-- t_c: "언제부터 출력이 이전 값이 아닌가?" → Hold에 사용
-
-**D FF의 지연 구분**
-- t_dCQ: Clock-to-Q Propagation Delay (최악)
-- t_cCQ: Clock-to-Q Contamination Delay (최선)
-
-**Setup Time Constraint ★★★**
-- t_cy > t_dCQ + t_dMax + t_s
-- Slack = t_cy - (t_dCQ + t_dMax + t_s)
-- Slack > 0 → 통과, Slack < 0 → 위반
-- 위반 시 해결: 클럭 주기 늘리기 or Critical Path 최적화
-
-**Hold Time Constraint ★★★**
-- t_h < t_cCQ + t_cMin
-- "Unsafe at any speed" — 클럭 주기와 무관!
-- 위반 시 해결: 버퍼 삽입으로 t_cMin 증가
-- FF를 직접 연결하면 Hold 위반 위험 (t_cMin = 0)
-
-**Clock Skew (t_k) 포함 수식**
-- Setup: t_cy > t_dCQ + t_dMax + t_s - t_k  (FF2가 늦게 받으면 Setup에 유리)
-- Hold:  t_h < t_cCQ + t_cMin + t_k         (같은 경우 Hold에 불리)
-- Skew 양면성: Setup ↔ Hold 트레이드오프
-
-**최소 클럭 주기 / 최대 주파수**
-- t_cy_min = t_dCQ + t_dMax + t_s - t_k
-- f_max = 1 / t_cy_min
-
-**합성 리포트 읽기**
-- Area Report: Combinational area, Noncombinational area, Total cell area
-- Timing Report: Startpoint→Endpoint, Incr(게이트 지연), Path(누적 지연), data arrival time
-- Levels of Logic: 크리티컬 패스 게이트 단수
-- Logic 지연 vs Route 지연: 둘의 비율로 최적화 방향 결정
+<!-- setup time, hold time, clock skew, 메타스태빌리티 -->
 
 ### 기타
 
@@ -345,23 +46,191 @@
 
 ## 디지털 집적회로
 
+> 삼성 DS System Expert Course | 서울대 김재준 교수
+
+---
+
+### Ch1. Digital Circuit Introduction (2026-03-18)
+
+**트랜지스터 (Transistor)**
+- "Trans + Resistor" — 전류를 제어하는 소자. 현대 디지털 칩은 대부분 MOSFET 사용
+- MOSFET 3단자: Gate(제어), Source(출발), Drain(도착)
+- Gate 아래 산화막(SiO₂)은 절연체 → 전기장으로만 채널 제어
+
+**반도체 (Semiconductor)**
+- 순수 Si: 자유 전하 없음 → 부도체에 가까움
+- 도핑(Doping): 불순물 주입으로 전도성 생성
+  - N-type: Donor 주입 → 자유 전자(음전하) 과잉
+  - P-type: Acceptor 주입 → 정공(양전하) 과잉
+- Shockley 주차장 비유: 2층 주차장에서 차(전자)와 빈자리(정공)의 이동으로 전도 설명
+
+**NMOS vs PMOS**
+- NMOS: Gate HIGH → ON (전자 채널), Gate LOW → OFF
+- PMOS: Gate LOW → ON (정공 채널), Gate HIGH → OFF
+- 두 특성이 상보적(Complementary) → CMOS의 근거
+- Vth (Threshold Voltage): ON/OFF 기준 전압
+
+**CMOS 인버터**
+- PMOS(위) + NMOS(아래) 구조
+- A=0: PMOS ON, NMOS OFF → Y=1 (VDD로 충전)
+- A=1: PMOS OFF, NMOS ON → Y=0 (GND로 방전)
+- 항상 하나만 ON → 정적 전류 이론상 0 → 저전력의 핵심
+
+**CMOS 일반 구조**
+- Pull-up Network (PUN): PMOS, 출력을 VDD로 올림
+- Pull-down Network (PDN): NMOS, 출력을 GND로 내림
+- PDN 직렬 ↔ PUN 병렬 (항상 쌍)
+- CMOS 게이트는 구조상 항상 반전 출력 (NAND, NOR, NOT만 직접 구현)
+
+**NAND / NOR**
+- NAND: PDN NMOS 직렬, PUN PMOS 병렬
+- NOR: PDN NMOS 병렬, PUN PMOS 직렬
+
+**설계 플로우 (Design Flow)**
+- Full-Custom: 회로도 → 시뮬레이션 → 레이아웃 → DRC → LVS → 추출 → Tape-out
+- Semi-Custom: 표준 셀 라이브러리 + 자동 배선
+- 추상화 3단계: 아키텍처 수준 → 논리 수준 → 기하학(레이아웃) 수준
+
+**무어의 법칙 (Moore's Law)**
+- 트랜지스터 수 2년마다 2배
+- 한계: 전력 밀도 폭증(Power Crisis), 누설 전류 증가, 전압 스케일링 어려움
+- 극복 시도: FinFET(3D 트랜지스터), 칩렛(Chiplet), 3D 집적
+- More Moore vs More than Moore
+
+---
+
+### Ch2. MOSFET Device Characteristics (2026-03-18)
+
+**에너지 밴드 (Energy Band)**
+- 전도 밴드(Conduction Band, Ec): 자유 전자 존재 가능
+- 가전자 밴드(Valence Band, Ev): 원자에 묶인 전자
+- 밴드갭(Band Gap, Eg): 전자가 존재할 수 없는 금지 구역. Si에서 ≈ 1.12eV
+
+**페르미 레벨 (Fermi Level, Ef)**
+- 전자가 존재할 확률이 정확히 50%인 에너지 레벨
+- Fermi-Dirac 분포: f(E) = 1 / (1 + e^((E-Ef)/kT))
+- 두 물질이 접촉하면 Ef가 같아질 때까지 전하 이동 → 평형
+
+**캐리어 농도 (Carrier Concentration)**
+- np = ni² (질량 작용 법칙) — 항상 일정
+- N-type: n ≈ Nd, p = ni²/Nd
+- P-type: p ≈ Na, n = ni²/Na
+
+**PN 접합 (PN Junction)**
+- N-P 접촉 시 확산(Diffusion)으로 캐리어 이동 → 공핍 영역(Depletion Region) 형성
+- 내장 전위(Built-in Potential, Vbi): 공핍층에 생기는 자연 전위차
+- 순방향 바이어스: 장벽 낮아짐 → 전류 지수함수적 증가 I = I₀(e^(qV/kT) - 1)
+- 역방향 바이어스: 장벽 높아짐 → 전류 거의 없음, 공핍층 넓어짐
+- MOSFET에서 Source/Drain-기판 접합은 항상 역방향 유지 필요
+
+**MOS 커패시터 (MOS Capacitor)**
+- Flat Band (VFB): 에너지 밴드가 평평한 기준 상태
+- Depletion (Vg > VFB): 정공 밀려남 → 공핍층 형성, Wd = √(2εsi·φs / qNA)
+- Inversion (Vg > VTH): 표면에 반전층(N채널) 형성 → 전류 통로 생성
+- 반전 전하: Qinv = Cox(Vg - VTH)
+
+**문턱 전압 (Threshold Voltage, VTH)**
+- 반전층이 형성되기 시작하는 최소 Gate 전압
+- VTH = VFB + 2φF + √(2εsi·qNA·2φF) / Cox
+
+**I-V 특성 — 선형 영역 (Linear Region)**
+- 조건: Vgs - Vt > Vds
+- Ids = μnCox(W/L)[(Vgs-Vt)Vds - Vds²/2]
+- 트랜지스터가 저항처럼 동작
+
+**I-V 특성 — 포화 영역 (Saturation Region)**
+- 조건: Vds > Vgs - Vt (핀치오프 발생)
+- Ids = (1/2)μnCox(W/L)(Vgs-Vt)²
+- Ids가 Vds와 무관 → Gate 전압으로만 전류 제어
+
+**채널 길이 변조 (Channel Length Modulation)**
+- 포화 시 Vds 증가 → 핀치오프 점 이동 → 유효 L 감소 → Ids 미세 증가
+- Ids = (1/2)μnCox(W/L)(Vgs-Vt)²(1 + λVds)
+
+**속도 포화 (Velocity Saturation)**
+- 단채널에서 전기장 강해짐 → 전자 속도 포화(vsat)에 도달
+- 장채널: Ids ∝ (Vgs-Vt)² / 단채널: Ids ∝ (Vgs-Vt) (선형에 가까워짐)
+
+**단채널 효과 (Short Channel Effects, SCE)**
+- VTH roll-off: 채널 짧아질수록 VTH 감소
+- DIBL (Drain-Induced Barrier Lowering): Vds 증가 → VTH 추가 감소
+
+**서브스레숄드 전류 (Subthreshold Current)**
+- Vgs < VTH에서도 지수함수적 누설 전류 존재
+- 서브스레숄드 스윙 S: 전류 10배 변화에 필요한 Vgs 변화량
+- S의 이론적 최솟값 = 60 mV/decade (상온, 300K) ← 현재 CMOS의 근본 한계
+
+**MOSFET 커패시턴스**
+- Gate 커패시턴스(CGC): OFF → Cox와 Cd 직렬 / ON → Cox
+- Source/Drain 접합 커패시턴스: 바닥면 + 측벽, 역방향 전압에 따라 변화
+
+---
+
+### Ch3. CMOS Circuit Basics (2026-03-18)
+
+**노이즈 마진 (Noise Margin)**
+- 노이즈 원인: 유도성 결합, 용량성 결합, 전원/접지 노이즈
+- 4개 기준 전압: VOH, VOL (출력), VIH, VIL (입력)
+- NMH = VOH - VIH (HIGH 신호 허용 노이즈)
+- NML = VIL - VOL (LOW 신호 허용 노이즈)
+- 이상적 인버터: NMH = NML = VDD/2
+
+**전압 전달 특성 (VTC, Voltage Transfer Characteristic)**
+- Vin을 0→VDD로 올리며 Vout 변화를 그린 DC 특성 곡선
+- VIL, VIH: VTC 기울기가 정확히 -1인 두 점
+- 5개 구간: A(NMOS off) → B(NMOS 약) → C(전환, 기울기 최대) → D(PMOS 약) → E(PMOS off)
+
+**재생 특성 (Regenerative Characteristics)**
+- Vin < VIL: 버퍼 반복 통과 시 VOL로 수렴 (신호 복원)
+- Vin > VIH: VOH로 수렴 (신호 복원)
+- VIL < Vin < VIH: 불확정, 수렴 방향 보장 안 됨
+- 좋은 게이트: VTC 기울기 절댓값 >> 1 → 불확정 영역 좁음
+
+**동적 전력 (Dynamic Power)**
+- P = CL × VDD² × f
+- 전환 시 에너지: 충전 시 CL·VDD² (절반은 PMOS에서 열소모, 절반은 CL 저장)
+- VDD 낮추기가 가장 효과적 저전력 방법 (제곱 비례)
+
+**정적 누설 전력 (Static Leakage Power)**
+- P_leak = I_leak × VDD
+- 원인: 서브스레숄드 전류 (Ch2 연결)
+- 현대 고성능 프로세서에서 무시 못 할 비중 차지
+
+**전파 지연 (Propagation Delay)**
+- RC 모델: MOSFET ON 상태 = 저항 R
+- tpLH = 0.69 × Rp × CL (Pull-up, 0→1)
+- tpHL = 0.69 × Rn × CL (Pull-down, 1→0)
+- tp = 0.69 × CL × (Rp + Rn)/2
+
+**인버터 사이징 (Inverter Sizing)**
+- PMOS W = 2 × NMOS W: μp ≈ μn/2 이므로 저항 같게 하려면 2배 필요
+- 직렬 N개 트랜지스터 → 각 W를 N배로 → 인버터와 동일 속도
+- NAND 2입력: NMOS W=2, PMOS W=2
+
+**인버터 체인 최적 사이징**
+- 등비수열로 크기 증가가 최적 (각 단 비율 동일)
+- α = (CL/Cin)^(1/N) (N: 단수)
+- 최적 비율 α ≈ e ≈ 2.7, 실용적 최적 단수 ≈ 3~4단
+
+---
+
 ### CMOS 기초
-<!-- NMOS/PMOS 동작, CMOS 인버터, 전달 특성 -->
+<!-- 위 Ch1~Ch3 내용으로 대체됨 -->
 
 ### 논리 게이트 설계
-<!-- CMOS 게이트, 복합 게이트, 사이징 -->
+<!-- Ch1 NAND/NOR, Ch3 사이징 참조 -->
 
 ### 전력 분석
-<!-- 동적 전력, 정적 전력, 누설 전류 -->
+<!-- Ch3 동적/정적 전력 참조 -->
 
 ### 배선 & 지연
-<!-- RC 모델, Elmore 지연, 인터커넥트 -->
+<!-- Ch3 RC 모델, 인버터 체인 참조 -->
 
 ### 메모리 회로
-<!-- SRAM 셀, DRAM, 센스 앰프 -->
+<!-- SRAM 셀, DRAM, 센스 앰프 — 미학습 -->
 
 ### 저전력 설계
-<!-- 전압 스케일링, 클럭 게이팅, 파워 게이팅 -->
+<!-- 전압 스케일링, 클럭 게이팅, 파워 게이팅 — 미학습 -->
 
 ### 기타
 
