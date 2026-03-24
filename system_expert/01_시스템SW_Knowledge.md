@@ -100,6 +100,15 @@
 | TSO (Total Store Ordering) | x86 | store buffer 허용 | Store→Load |
 | Weak Ordering | ARM | 거의 모든 재정렬 허용 | 대부분 |
 
+### Breakpoint 3종류 비교 ★
+
+| 종류 | 구현 방식 | 개수 제한 | 코드 수정 | 용도 |
+|------|-----------|-----------|-----------|------|
+| **Software** | `int 3` (0xcc) 삽입 → SIGTRAP | 무제한 | 필요 | 실행 흐름 중단 |
+| **Hardware** | CPU DR0~DR3 레지스터 | 최대 4개 | 불필요 | 실행 흐름 중단 |
+| **Memory** | 페이지 권한 변경 → Protection Fault | 제한적 | 불필요 | 메모리 접근 감지 |
+
+
 ### 주요 시그널 ★
 
 | ID | 이름 | 기본 동작 | 발생 원인 | 재정의 가능 |
@@ -187,6 +196,12 @@
 | **TLB (Translation Lookaside Buffer)** | MMU 내부의 소형 PTE 캐시. 주소 변환 속도를 높이기 위해 사용 |
 | **Thread Safety** | 여러 스레드가 동시에 호출해도 항상 올바른 결과를 반환하는 함수의 속성 |
 | **Thrashing** | 프로세스의 Working Set이 물리 메모리를 초과하여 페이지 교체가 폭주하는 현상 |
+| **Breakpoint** | 프로그램 실행을 특정 지점에서 중단시키는 디버깅 메커니즘. Software/Hardware/Memory 3종류 존재 |
+| **DR0~DR3** | x86-64 CPU의 하드웨어 디버그 레지스터. 최대 4개의 Hardware Breakpoint 주소 저장 |
+| **int 3 (0xcc)** | x86 소프트웨어 브레이크포인트 명령어. 실행 시 SIGTRAP 발생 |
+| **ptrace** | tracer 프로세스가 tracee 프로세스의 메모리/레지스터를 관찰·제어하는 시스템 콜. GDB·strace의 핵심 |
+| **strace** | ptrace(PTRACE_SYSCALL)를 활용하여 프로세스의 시스템 콜을 추적하는 도구 |
+| **Tracer / Tracee** | ptrace에서 제어하는 프로세스(tracer)와 제어받는 프로세스(tracee) |
 | **Use-After-Free (UAF)** | 해제된 메모리를 재사용할 때 발생하는 취약점. Dangling Pointer가 원인 |
 | **v-node Table** | 파일의 실제 메타데이터(크기, 타입, 접근 권한 등 stat 구조체 내용)를 저장하는 테이블 |
 | **Virtual Memory** | 물리 메모리보다 큰 주소 공간을 제공하고 프로세스 격리를 구현하는 추상화 메커니즘 |
@@ -326,3 +341,49 @@
 - [ ] **VM 3가지 역할**: Caching / Memory Management / Memory Protection
 - [ ] **Page Fault 처리 흐름**: 7단계 순서대로 설명
 - [ ] **Segregated List**: 왜 first-fit이 best-fit에 근사하는가
+
+---
+
+### Ch14. Debugger & ptrace
+
+#### 핵심 개념
+- **Debugger**: 다른 프로그램(target/tracee)을 테스트·제어하는 프로그램 (GDB, strace)
+- **ptrace**: tracer가 tracee의 메모리/레지스터를 관찰·제어하는 시스템 콜
+  - `long ptrace(enum __ptrace_request request, pid_t pid, void *addr, void *data)`
+  - GDB, strace 모두 ptrace 기반으로 구현
+
+#### ptrace 주요 Request ★
+| Request | 동작 |
+|---------|------|
+| PTRACE_TRACEME | 자신을 부모가 trace하도록 허용 |
+| PTRACE_PEEKTEXT/DATA | Tracee 메모리 word 읽기 |
+| PTRACE_POKETEXT/DATA | Tracee 메모리 word 쓰기 |
+| PTRACE_GETREGS | Tracee 레지스터 전체 복사 |
+| PTRACE_SETREGS | Tracee 레지스터 전체 덮어쓰기 |
+| PTRACE_CONT | 정지된 tracee 재개 |
+| PTRACE_SYSCALL | 다음 syscall 진입/탈출 시 정지 후 재개 |
+| PTRACE_SINGLESTEP | 명령어 1개 실행 후 정지 |
+
+#### Breakpoint 3종류 ★
+- **Software**: `int 3` (opcode `0xcc`, 1바이트) 삽입 → SIGTRAP 발생 → GDB 개입 / 개수 무제한
+- **Hardware**: CPU 디버그 레지스터 DR0~DR3에 주소 저장 → 최대 4개 / 코드 수정 불필요
+- **Memory**: 페이지 권한 변경 → Protection Fault → 메모리 접근(읽기/쓰기) 감지
+
+#### GDB 기반 Debugger 동작 흐름
+```
+fork() → 자식: PTRACE_TRACEME → execve() → SIGTRAP(자동) → 정지
+부모(GDB): waitpid() → PTRACE_POKETEXT(0xcc 삽입) → PTRACE_CONT
+→ 브레이크포인트 도달 → SIGTRAP → PTRACE_GETREGS → 레지스터 읽기
+→ 원래 바이트 복원 → PTRACE_SINGLESTEP → 반복
+```
+
+#### GDB 주요 명령어
+```
+run / break *ADDR / stepi / continue
+info registers / set $REG=VALUE / x ADDRESS / set *ADDRESS=VALUE
+```
+
+### Ch14 추가 체크리스트
+- [ ] **ptrace Request 구분**: PEEK/POKE/GETREGS/SETREGS/CONT/SYSCALL/SINGLESTEP 역할
+- [ ] **Breakpoint 3종 비교**: Software(0xcc/무제한) vs Hardware(DR레지스터/4개) vs Memory(페이지 권한)
+- [ ] **GDB 동작 흐름**: fork→TRACEME→execve→SIGTRAP→waitpid→0xcc삽입→CONT 순서
