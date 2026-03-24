@@ -1,6 +1,6 @@
 # 시스템 프로그래밍 — 오픈북 시험 최적화 정리
 
-> 마지막 업데이트: 2026-03-18 | Ch1~Ch13 수록 | ★ = 시험 출제 가능성 높음
+> 마지막 업데이트: 2026-03-24 | Ch1~Ch15 수록 | ★ = 시험 출제 가능성 높음
 
 ---
 
@@ -99,6 +99,27 @@
 | Sequential Consistency | (이론) | 가장 강력, 직관적 | 없음 |
 | TSO (Total Store Ordering) | x86 | store buffer 허용 | Store→Load |
 | Weak Ordering | ARM | 거의 모든 재정렬 허용 | 대부분 |
+
+
+### Security Attacks 비교 ★
+
+| 공격 | 대상 | 원리 | 특징 | 대응책 |
+|------|------|------|------|--------|
+| **Cold Boot** | DRAM 암호화 키 | 냉각으로 데이터 소멸 지연 | 물리 접근 필요 | TRESOR(레지스터에만 키) |
+| **Timing Side-Channel** | 비밀 정보 | 실행 시간 차이 측정 | 소프트웨어 취약점 | Constant-time 구현 |
+| **Cache Side-Channel** | 메모리 접근 패턴 | Flush+Reload 시간 측정 | 원격 가능 | 캐시 파티셔닝 |
+| **Meltdown** | 커널 메모리 | Speculative Exec + 캐시 채널 | 하드웨어 설계 결함 | KPTI |
+| **Rowhammer** | DRAM 비트 | 인접 Row 반복 접근 | 버그 없이 공격 가능 | ECC DRAM, TRR |
+
+### Meltdown vs Rowhammer ★
+
+| 항목 | Meltdown | Rowhammer |
+|------|----------|-----------|
+| 공격 레이어 | CPU (투기적 실행) | DRAM (물리적 비트 플립) |
+| 필요 조건 | 코드 실행 권한 | 메모리 할당 권한 |
+| 정보 유출 | 커널 메모리 읽기 | PTE 변조 → 권한 상승 |
+| 소프트웨어 버그 | 불필요 (HW 설계 결함) | 불필요 (HW 물리 결함) |
+| 대응 | KPTI (SW 패치) | ECC DRAM (HW 교체) |
 
 ### Breakpoint 3종류 비교 ★
 
@@ -202,6 +223,18 @@
 | **ptrace** | tracer 프로세스가 tracee 프로세스의 메모리/레지스터를 관찰·제어하는 시스템 콜. GDB·strace의 핵심 |
 | **strace** | ptrace(PTRACE_SYSCALL)를 활용하여 프로세스의 시스템 콜을 추적하는 도구 |
 | **Tracer / Tracee** | ptrace에서 제어하는 프로세스(tracer)와 제어받는 프로세스(tracee) |
+| **Cache Side-Channel** | 캐시 hit/miss의 접근 시간 차이를 이용해 피해자의 메모리 접근 패턴을 추론하는 공격 |
+| **clflush** | x86 캐시 라인 강제 비우기 명령어. Rowhammer와 Flush+Reload 공격에 활용 |
+| **Cold Boot Attack** | DRAM을 냉각하여 데이터 소멸을 지연시킨 후 암호화 키를 추출하는 물리 공격 |
+| **ECC DRAM** | 오류 수정 코드를 내장한 DRAM. Rowhammer로 인한 단일 비트 플립을 감지·수정 |
+| **Flush+Reload** | 공유 메모리 캐시를 비운 뒤 피해자 접근 후 재접근 시간을 측정하는 cache side-channel 기법 |
+| **KPTI** (Kernel Page Table Isolation) | Meltdown 대응책. 커널과 유저 모드의 페이지 테이블을 완전 분리. 5~20% 성능 저하 |
+| **Meltdown** | CPU의 투기적 실행(Speculative Execution)과 캐시 부채널을 결합하여 커널 메모리를 유출하는 공격 |
+| **Rowhammer** | DRAM의 인접 행(Row)을 반복 접근하여 전하 누설로 비트를 뒤집는 하드웨어 공격 |
+| **Side-Channel Attack** | 알고리즘 자체가 아닌 구현의 부수 정보(타이밍, 전력, 음향, 전자기)를 이용한 공격 |
+| **Speculative Execution** | CPU가 성능 향상을 위해 결과가 확정되기 전에 미리 명령어를 실행하는 기법. Meltdown의 근본 원인 |
+| **TRESOR** | 암호화 키와 AES 연산을 CPU 레지스터에만 유지하여 Cold Boot Attack을 방어하는 Linux 커널 패치 |
+| **Transient Instruction** | 투기적 실행으로 실행되었다가 커밋되지 않고 되돌려지는 명령어 |
 | **Use-After-Free (UAF)** | 해제된 메모리를 재사용할 때 발생하는 취약점. Dangling Pointer가 원인 |
 | **v-node Table** | 파일의 실제 메타데이터(크기, 타입, 접근 권한 등 stat 구조체 내용)를 저장하는 테이블 |
 | **Virtual Memory** | 물리 메모리보다 큰 주소 공간을 제공하고 프로세스 격리를 구현하는 추상화 메커니즘 |
@@ -387,3 +420,13 @@ info registers / set $REG=VALUE / x ADDRESS / set *ADDRESS=VALUE
 - [ ] **ptrace Request 구분**: PEEK/POKE/GETREGS/SETREGS/CONT/SYSCALL/SINGLESTEP 역할
 - [ ] **Breakpoint 3종 비교**: Software(0xcc/무제한) vs Hardware(DR레지스터/4개) vs Memory(페이지 권한)
 - [ ] **GDB 동작 흐름**: fork→TRACEME→execve→SIGTRAP→waitpid→0xcc삽입→CONT 순서
+
+### Ch15 추가 체크리스트
+- [ ] **Cold Boot Attack 흐름**: DRAM 냉각 → 분리 → 다른 머신 → 키 추출 / TRESOR 대응
+- [ ] **Timing Side-Channel**: strcmp 조기 반환 원리 → 복잡도 52⁹ → 52×9
+- [ ] **Flush+Reload 3단계**: flush → victim 접근 대기 → reload 시간 측정
+- [ ] **Meltdown 동작**: Speculative Exec → kernel_data를 인덱스로 → 캐시 흔적 → Flush+Reload
+- [ ] **KPTI 부작용**: TLB flush + PT 교체 → 5~20% 성능 저하
+- [ ] **Rowhammer 2가지 도전**: Cache bypass(clflush) / Address info(VA 하위 12bit=PA)
+- [ ] **Rowhammer 공격 2가지**: NaCl sandbox escape / Linux 권한 상승(PTE 비트 플립)
+- [ ] **Meltdown vs Rowhammer 차이**: CPU 투기적 실행 vs DRAM 물리적 비트 플립
