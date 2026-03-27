@@ -1,6 +1,6 @@
 # 디지털 집적회로 (Digital Integrated Circuits) — 오픈북 시험 대비 정리
 
-> 삼성 DS System Expert Course | 서울대 김재준 교수 | 최종 업데이트: 2026-03-23
+> 삼성 DS System Expert Course | 서울대 김재준 교수 | 최종 업데이트: 2026-03-27
 
 ---
 
@@ -40,6 +40,18 @@
 | **[Ch5] 배선 지연 의존성** | twire ∝ L² | L: 배선 길이 (Rw∝L, Cw∝L) |
 | **[Ch5] 최적 리피터 크기** | Wopt = √(Rinv·Cw / Rw·Cinv) | |
 | **[Ch5] 최적 리피터 수** | Nopt = √(Rw·Cw / 2Rinv·Cinv) | |
+| **[Ch6] FF 최대 지연 (setup)** | tpd ≤ Tc − tpcq − tsetup | Tc: 클럭 주기, tpcq: CLK→Q 전파 지연 |
+| **[Ch6] FF 최대 지연 (skew 포함)** | tpd ≤ Tc − tpcq − tsetup − tskew | tskew: 클럭 스큐 |
+| **[Ch6] FF 최소 지연 (hold)** | tcd ≥ thold − tccq | tccq: CLK→Q 오염 지연, tcd: 조합 논리 오염 지연 |
+| **[Ch6] FF 최소 지연 (skew 포함)** | tcd + tccq ≥ thold + tskew | |
+| **[Ch6] Pulsed Latch 최대 지연** | tpd ≤ Tc − tpcq − tsetup + Tpw | Tpw: 펄스 폭 (Time Borrowing) |
+| **[Ch6] Pulsed Latch 최소 지연** | tcd ≥ thold − tccq + Tpw | |
+| **[Ch6] Two-Phase 최대 지연** | Tc ≥ tpdq1 + tpd1 + tpdq2 + tpd2 | setup overhead 없음 |
+| **[Ch6] Time Borrowing 최대량** | tborrow = Tc/2 − tsetup | |
+| **[Ch6] Two-Phase 최소 지연** | tccq + tcd ≥ thold | 매 Tc/2마다 성립해야 함 |
+| **[Ch8] DRAM 읽기 전압변화 "1"** | ΔVbl = +Ccell·VDD/2 / (Cbl+Ccell) | Ccell: 셀 커패시턴스, Cbl: 비트라인 커패시턴스 |
+| **[Ch8] DRAM 읽기 전압변화 "0"** | ΔVbl = −Ccell·VDD/2 / (Cbl+Ccell) | |
+| **[Ch8] 전하 공유 전압** | V(X2) = VDD × C2/(C1+C2) | 내부 노드 프리차지 없을 때 전압 강하 |
 
 ---
 
@@ -102,6 +114,60 @@
 | 지연 추세 | 공정 발전 시 개선 | 저항 증가로 악화 가능 |
 | 리피터 필요성 | 불필요 | 주요 대상 ★ |
 
+### 클로킹 방식 비교 (Ch6)
+
+| 항목 | FF (Edge-Triggered) | Pulsed Latch | Two-Phase Latch |
+|------|-------------------|--------------|-----------------|
+| 최대 지연 | Tc − tpcq − tsetup | Tc − tpcq − tsetup + Tpw | Tc − tpdq1 − tpdq2 |
+| Setup overhead | 있음 | 있음 (Tpw로 완화) | 없음 (Time Borrowing으로 대체) |
+| 최소 지연 조건 | tcd ≥ thold − tccq | tcd ≥ thold − tccq + Tpw | tccq+tcd ≥ thold (매 Tc/2) |
+| Time Borrowing | 없음 | Tpw만큼 | Tc/2 − tsetup만큼 |
+| 구현 복잡도 | 단순 | 보통 | 복잡 (2개 클럭) |
+| 사용 빈도 | 가장 많음 | 고성능 설계 | 특수 설계 |
+
+### D-Latch vs D Flip-Flop (Ch6)
+
+| 항목 | D-Latch | D Flip-Flop |
+|------|---------|-------------|
+| 트리거 방식 | 레벨 감지 (Level-Sensitive) | 엣지 트리거 (Edge-Triggered) |
+| CLK=1 | 투명 (D→Q 통과) | 이전 값 유지 (Slave 불투명) |
+| CLK=0 | 불투명 (Q 유지) | 샘플링 준비 (Master 투명) |
+| 데이터 캡처 | CLK=1인 동안 계속 | 상승 에지 순간만 |
+| 구성 | 단일 래치 | 마스터(CLK_bar)+슬레이브(CLK) 직렬 |
+| 더블 샘플링 위험 | 있음 | 없음 |
+
+### 다이나믹 회로 비교 (Ch7)
+
+| 항목 | Unfooted | Footed | 정적 CMOS |
+|------|---------|--------|-----------|
+| PDN 구성 | NMOS만 | NMOS + 풋 NMOS | NMOS + PMOS PUN |
+| 프리차지 입력 조건 | 반드시 0 | 제약 없음 | 해당 없음 |
+| LE (논리 노력) | 작음 (빠름) | 큼 (느림) | 중간 |
+| 충돌 가능성 | 있음 | 없음 | 없음 |
+| 출력 단조성 | 0→1만 가능 | 0→1만 가능 | 양방향 |
+
+### 메모리 종류 비교 (Ch8)
+
+| 항목 | SRAM | DRAM | Flash (NAND) | Flash (NOR) |
+|------|------|------|--------------|-------------|
+| 셀 구성 | 6T | 1T-1C | 1T (FG) | 1T (FG) |
+| 휘발성 | 휘발성 | 휘발성 | 비휘발성 | 비휘발성 |
+| 리프레시 | 불필요 | 필요 (~64ms) | 불필요 | 불필요 |
+| 읽기 방식 | 비파괴 | 파괴적 (복원 필요) | 비파괴 | 비파괴 |
+| 셀 면적 | 큼 | 작음 | 매우 작음 | 작음 |
+| 속도 | 빠름 | 보통 | 느림 | 보통 |
+| 사용처 | 캐시 | 메인 메모리 | SSD·스토리지 | 펌웨어·부팅 |
+
+### DRAM vs eDRAM Gain Cell (Ch8)
+
+| 항목 | 표준 DRAM (1T-1C) | Gain Cell (3T) |
+|------|-----------------|----------------|
+| 셀 구조 | 트랜지스터 1 + 커패시터 | 트랜지스터 3개 |
+| 읽기 방식 | 파괴적 (복원 필요) | 비파괴적 |
+| 데이터 저장소 | 별도 커패시터 | 트랜지스터 게이트 커패시턴스 |
+| 누설 특성 | NMOS 기판 누설 | PMOS 게이트 누설 (더 작음) |
+| 집적도 | 높음 | 낮음 |
+
 ---
 
 ## ③ 용어 정의 (가나다순)
@@ -151,6 +217,33 @@
 | VIL | — | 입력으로 LOW를 인식하는 최대 전압. VTC 기울기 −1 점 |
 | VOH | — | 출력 HIGH 최솟값 |
 | VOL | — | 출력 LOW 최댓값 |
+| 게인 셀 | Gain Cell | 읽기 경로가 저장 노드와 분리된 eDRAM 셀. 비파괴 읽기 가능 |
+| 단조성 | Monotonicity | 다이나믹 회로에서 평가 중 출력이 0→1로만 변할 수 있는 특성 |
+| 더블 샘플링 | Double Sampling | 래치 투명 구간에 데이터가 두 번 통과하는 오류 |
+| 도미노 로직 | Domino Logic | 다이나믹 게이트 + 정적 인버터. 단조성 문제 해결 |
+| 리프레시 | Refresh | DRAM에서 누설로 사라지는 전하를 주기적으로 재충전하는 동작 (~64ms) |
+| 분산 RC | Distributed RC | 배선을 무한히 작은 R·C 단위의 연속 구조로 모델링 |
+| 비파괴 읽기 | Non-destructive Read | 읽기 후 저장 데이터가 손상되지 않는 읽기 방식 |
+| 셋업 타임 | Setup Time (tsetup) | 클럭 에지 이전 데이터가 안정되어야 하는 최소 시간 |
+| 시간 빌리기 | Time Borrowing | 래치 투명 구간을 이용해 다음 단계의 시간을 빌려 쓰는 기법 |
+| 오염 지연 | Contamination Delay (tcd) | 입력 변화 후 출력이 처음 흔들리기 시작하는 최소 시간 |
+| 전하 공유 | Charge Sharing | 다이나믹 회로 내부 노드 간 전하 재분배로 출력 전압 강하 |
+| 전파 지연 (CLK→Q) | Clock-to-Q Delay (tpcq) | 클럭 에지 후 FF 출력이 최종값에 도달하는 시간 |
+| 컨트롤 게이트 | Control Gate | Flash 셀에서 외부 전압을 인가하는 게이트 |
+| 클럭 스큐 | Clock Skew (tskew) | 인접 FF 간 클럭 도달 시간 차이 |
+| 키퍼 | Keeper | 다이나믹 회로에서 누설 전류를 막는 약한 PMOS |
+| 투명 모드 | Transparent Mode | D-Latch에서 CLK=1일 때 D가 Q로 그대로 통과하는 상태 |
+| 파울러-노르트하임 터널링 | Fowler-Nordheim Tunneling | Flash 소거 시 전자가 얇은 산화막을 양자 터널링으로 통과하는 현상 |
+| 파괴적 읽기 | Destructive Read | 읽기 동작이 저장 데이터를 손상시켜 복원이 필요한 방식 (DRAM) |
+| 핫 전자 주입 | Hot Electron Injection | Flash 프로그래밍 시 높은 에너지 전자가 터널 산화막을 넘어 FG에 주입 |
+| 홀드 타임 | Hold Time (thold) | 클럭 에지 이후 데이터가 안정되어야 하는 최소 시간 |
+| 플로팅 게이트 | Floating Gate | Flash 셀에서 전하를 저장하는 완전 절연된 도체 게이트 |
+| CLK-to-Q 오염 지연 | CCQ (tccq) | 클럭 에지 후 FF 출력이 처음 흔들리기 시작하는 최소 시간 |
+| DSL/SSL | Drain/Source Select Line | NAND Flash에서 스트링의 드레인/소스 선택 트랜지스터 제어선 |
+| FN 터널링 | FN Tunneling | → 파울러-노르트하임 터널링 참조 |
+| Vpass | — | NAND Flash 읽기 시 비선택 셀을 강제로 켜는 통과 전압 (~4-5V) |
+| Vread | — | NAND Flash 읽기 시 선택 셀에 인가하는 읽기 판별 전압 (~0V) |
+| WL / BL | Word Line / Bit Line | 메모리에서 행 선택선(WL)과 열 데이터선(BL) |
 
 ---
 
@@ -220,6 +313,52 @@
 - **리피터 효과**: N 구간 분할 → 지연 L²→L로 개선. 단, 전력 증가 트레이드오프
 - **글로벌 배선**: 공정 스케일링으로 길이 안 줄어듦 + 저항 증가 → 지연 악화. 리피터 삽입 주요 대상
 
+### Ch6. Clocking Elements
+
+- **D-Latch**: CLK=1 → 투명(D=Q), CLK=0 → 불투명(Q 유지). 레벨 감지 래치
+- **D Flip-Flop**: 마스터(CLK_bar)+슬레이브(CLK) 두 래치 직렬. 상승 에지 순간만 캡처
+- **FF가 래치보다 선호되는 이유**: 더블 샘플링 문제 방지. 명확한 동기화
+- **Setup Time**: 클럭 에지 이전 tsetup 동안 D 안정 필요. 측정: tclk-q가 10% 증가하는 시점
+- **Hold Time**: 클럭 에지 이후 thold 동안 D 안정 필요. 측정: tclk-q가 10% 증가하는 시점
+- **tpd vs tcd**: tpd = 최악 지연(출력 최종 안정), tcd = 최선 지연(출력 처음 흔들림). tcd ≤ tpd
+- **클럭 스큐 영향**: Setup 위반 최악 = 수신 FF 클럭이 먼저 도달. Hold 위반 최악 = 수신 FF 클럭이 늦게 도달
+- **Pulsed Latch**: Tpw만큼 최대 tpd 연장(Time Borrowing). 동시에 최소 tcd 조건 강화
+- **Two-Phase Latch**: Setup overhead 없음. Time Borrowing = Tc/2 − tsetup. 매 Tc/2마다 Hold 조건 검사
+- **Time Borrowing 의미**: 래치 투명 구간 동안 늦게 도착한 데이터도 통과 가능 → 느린 경로 허용
+
+### Ch7. Dynamic Circuits
+
+- **다이나믹 기본 동작**: CLK=0 → 프리차지(Y=VDD), CLK=1 → 평가(PDN 동작, 조건부 방전)
+- **장점**: PMOS PUN 제거 → LE 감소, 트랜지스터 수 감소, 빠른 방전
+- **단조성**: 평가 중 출력은 0→1만 가능. 1→0은 불가 (프리차지로만 1 복원)
+- **단조성 문제**: 이전 단 출력이 평가 시작 순간 잠깐 1 → 다음 단 오평가
+- **도미노 해결**: 다이나믹 + 인버터 → 출력 항상 0에서 시작 → 0→1만 전파. 비반전 로직
+- **Unfooted**: 빠름, 프리차지 중 입력 0 필수. Footed: 안전, LE 나쁨
+- **FF 뒤 첫 단**: 반드시 Footed (Q=1 상태에서 프리차지 시작 가능)
+- **Keeper**: 약한 PMOS. 누설 전류 > Keeper > 이기면 안 됨 (평가 방해 금지)
+- **전하 공유**: 내부 노드 부동 → 전하 재분배 → Vout 강하. 해결: 내부 노드도 프리차지
+- **파이프라인**: CL1/CL2 반대 위상 클럭으로 교번 → 전체 클럭 주기 활용
+- **차동 도미노**: F와 F' 동시 계산 → 비반전 제약 해소. 트랜지스터 2배
+- **현재 위치**: 정적 CMOS에 밀림. 메모리 읽기/쓰기 경로(와이드 OR 구조)에 주로 사용
+- **전력 문제**: 매 사이클 프리차지 스위칭 → 정적 CMOS보다 스위칭 활동 높음
+
+### Ch8. Memory Cell Operations
+
+- **DRAM 구조**: 1T-1C. WL=1로 NMOS 켜서 BL↔C_cell 연결. C_cell 전하가 데이터
+- **DRAM Dynamic 의미**: 전하 누설 → 시간 지나면 데이터 소실 → 64ms마다 리프레시 필수
+- **DRAM 쓰기**: BL=VDD(쓰기1) 또는 BL=GND(쓰기0), WL=1 → C_cell 충방전
+- **DRAM 읽기**: BL 플로팅 → WL=1 → C_cell과 C_BL 전하 공유 → ΔV_BL 발생 (수십~수백 mV)
+- **파괴적 읽기**: 읽기 후 C_cell 전하 손상 → 센스 앰프가 증폭 후 반드시 복원
+- **ΔV_BL이 작은 이유**: C_BL >> C_cell → 공유 후 전압 변화 미미 → 센스 앰프 필수
+- **eDRAM Gain Cell**: 읽기/쓰기 경로 분리 → 비파괴 읽기. PMOS 사용(게이트 누설↓)
+- **3T Gain Cell 데이터 유지**: "1" 유지 시간 > "0" 유지 시간 (자기 역방향 바이어스 효과)
+- **Flash 구조**: 플로팅 게이트(FG) + 컨트롤 게이트. FG 전하량 → Vth 변화 → 데이터 표현
+- **프로그래밍 (쓰기 "0")**: 핫 전자 주입. 컨트롤 게이트+드레인 고전압 → 뜨거운 전자가 FG로 주입
+- **소거 ("1")**: FN 터널링. 소스 고전압 → 전자가 터널 산화막 통과해 FG 탈출. 블록 단위
+- **Flash 내구성 제한**: 고전압 반복으로 터널 산화막 열화 → 통상 10,000~100,000회
+- **NAND 구조**: 셀 직렬 연결 → 고밀도. 선택 셀=Vread(0V), 비선택 셀=Vpass(4-5V 강제 통과)
+- **NOR 구조**: 셀 병렬 연결 → 임의 접근, XIP 가능. 펌웨어·부팅 코드 저장
+
 ---
 
 ## ⑤ 시험 대비 체크리스트
@@ -239,6 +378,12 @@
 - [ ] **배선 저항 계산**: ρ, L, W, H 주어졌을 때 R 계산. 정사각형 수(L/W)로도 계산
 - [ ] **Elmore 지연 계산**: RC 트리 그림 보고 특정 노드의 Elmore 지연 계산
 - [ ] **리피터 최적화**: Rw, Cw, Rinv, Cinv 주어졌을 때 Nopt, Wopt 계산
+- [ ] **FF 최대 tpd 계산**: Tc, tpcq, tsetup, tskew 주어졌을 때 허용 최대 tpd 계산
+- [ ] **FF 최소 tcd 계산**: thold, tccq, tskew 주어졌을 때 필요 최소 tcd 계산
+- [ ] **Pulsed Latch 지연**: Tpw 주어졌을 때 FF 대비 최대 tpd 개선량 계산
+- [ ] **Two-Phase Time Borrowing**: Tc, tsetup 주어졌을 때 최대 tborrow 계산
+- [ ] **DRAM ΔVbl 계산**: Ccell, Cbl, VDD 주어졌을 때 읽기 전압 변화 계산
+- [ ] **전하 공유 전압 계산**: C1, C2, VDD 주어졌을 때 전하 공유 후 V(X2) 계산
 
 ### 개념 문제 유형
 
@@ -257,3 +402,17 @@
 - [ ] 커플링 커패시턴스의 밀러 효과 설명 (역상 vs 동상)
 - [ ] Low-k 유전체와 High-k 유전체가 각각 어디에 왜 쓰이는가
 - [ ] 채널 길이 변조(λ)가 짧은 채널에서 더 심한 이유
+- [ ] D-Latch와 D FF의 차이, FF이 선호되는 이유 (더블 샘플링)
+- [ ] Setup Time과 Hold Time의 정의와 측정 방법 (tclk-q 10% 증가 기준)
+- [ ] 클럭 스큐가 Setup/Hold Time에 미치는 영향 (각각 최악 조건)
+- [ ] Pulsed Latch의 Time Borrowing 원리와 Hold Time 조건이 강화되는 이유
+- [ ] Two-Phase Latch에서 Setup overhead가 사라지는 이유
+- [ ] 다이나믹 회로에서 단조성 문제가 발생하는 원인과 도미노 로직의 해결 원리
+- [ ] Keeper의 크기 설계 딜레마 (너무 강하면 vs 너무 약하면)
+- [ ] 전하 공유 문제의 원인과 내부 노드 프리차지 해결책
+- [ ] DRAM 읽기가 파괴적인 이유와 복원이 필요한 이유
+- [ ] DRAM ΔVbl이 작은 이유 (Cbl >> Ccell)와 센스 앰프가 필요한 이유
+- [ ] Flash 플로팅 게이트가 데이터를 저장하는 원리 (Vth 변화)
+- [ ] Flash 프로그래밍(핫 전자 주입)과 소거(FN 터널링)의 차이
+- [ ] NAND Flash 읽기에서 Vpass와 Vread의 역할
+- [ ] NAND Flash와 NOR Flash의 구조적 차이와 각각의 사용처
