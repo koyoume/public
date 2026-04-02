@@ -415,11 +415,11 @@ RS Latch → Gated Latch → Master-Slave FF → D Flip-flop
 
 **정리하기 — 핵심 요약 (슬라이드 직접 발췌)**
 - Power는 **Static Power(Leakage)**와 **Dynamic Power**로 나뉜다
-- Leakage power에 가장 민감한 두 요소: **Vth**, **Tox**
-- Dynamic power에 가장 민감한 두 요소: **V²**, **F**
+- Leakage power에 가장 민감한 두 요소: **Vth**, **transistor channel width (W)**
+- Dynamic power에 가장 민감한 두 요소: **supply voltage (V)**, **switching activity factor (S)**
 - Power를 줄이는 주요 두 가지 이유: **발열(thermal)**, **배터리 수명**
-- Clock Gating 두 종류: **ILD** (enable 있는 FF에만 적용), **DTD** (XOR 기반, 범용)
-- DTD의 단점: **area overhead** (면적 증가), 완화 방법 연구 중
+- Clock Gating 두 종류: **ILD** (MUX feedback loop 있는 FF에만 적용), **DTD** (XOR 기반, 범용)
+- DTD의 단점: **XOR overhead** (면적/지연 증가), 완화 방법 연구 중
 - Power Gating: **전원**을 동적으로 차단 → **leakage** 전류 소모 감소
 - DVS: **전압**을 동적으로 변화 → **dynamic** 전류 소모 감소
 - Power Gating + DVS: **IoT** 관련 제품에 필수적인 설계 요소
