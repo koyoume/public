@@ -413,6 +413,19 @@ RS Latch → Gated Latch → Master-Slave FF → D Flip-flop
 - Power Gating: 전원 차단(Static+Dynamic↓), SRFF로 상태 보존
 - DVS: 전압/주파수 동적 조절, DC-DC Converter 필요
 
+**정리하기 — 핵심 요약 (슬라이드 직접 발췌)**
+- Power는 **Static Power(Leakage)**와 **Dynamic Power**로 나뉜다
+- Leakage power에 가장 민감한 두 요소: **Vth**, **Tox**
+- Dynamic power에 가장 민감한 두 요소: **V²**, **F**
+- Power를 줄이는 주요 두 가지 이유: **발열(thermal)**, **배터리 수명**
+- Clock Gating 두 종류: **ILD** (enable 있는 FF에만 적용), **DTD** (XOR 기반, 범용)
+- DTD의 단점: **area overhead** (면적 증가), 완화 방법 연구 중
+- Power Gating: **전원**을 동적으로 차단 → **leakage** 전류 소모 감소
+- DVS: **전압**을 동적으로 변화 → **dynamic** 전류 소모 감소
+- Power Gating + DVS: **IoT** 관련 제품에 필수적인 설계 요소
+- Power Gating 설계 고려사항: ①**rush current**에 의한 IR-drop ②**state retention**에 따른 설계 overhead
+- DVS 추가 overhead: **DC-DC Converter**의 효율적인 사용 필요
+
 ### Combinational Building Blocks (Chap 8)
 **설계 철학: Divide and Conquer — 블록 조립**
 - Decoder: 이진→One-hot. `b = 1<<a`. 분할: n비트를 k비트씩 나눠 Decoder + AND 조합
