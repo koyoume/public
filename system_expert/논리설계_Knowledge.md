@@ -436,9 +436,28 @@ RS Latch → Gated Latch → Master-Slave FF → D Flip-flop
 - Eq Comparator: `assign eq = (a==b)`. Mag Comparator: `assign gt = (a>b)`
 - Maximum Unit: Magnitude Comparator + 2:1 MUX 결합
 - Barrel Shifter: 순환 시프트. 밀려난 비트가 반대쪽으로 재투입
-- ROM: Decoder + 연결망. 2D 배열로 구현. 임의 논리 함수 구현 가능
-- RAM: ROM + 쓰기 기능. 단일포트/듀얼포트
-- PLA: AND 배열 + OR 배열. 필요한 곱항만 생성 → ROM보다 효율적
+
+**ROM (Read-Only Memory)**
+- 인터페이스: n비트 주소(a) → m비트 데이터(d). 읽기 전용, 비휘발성
+- 내부 구조: Decoder(주소→Word line One-hot) + 연결망(저장값) + Bit line
+- 연결 있음=1, 연결 없음=0으로 데이터 저장
+- 2D Array: 주소를 상위(행→Decoder)와 하위(열→MUX)로 분할 → 정사각형 배열
+  → Bit line 길이 최소화 → RC 지연 감소 → 속도↑
+  → 예: 256×16 ROM = 64행×64열, a[7:2]=행, a[1:0]=열 MUX
+- 논리 함수 구현: 진리표 그대로 저장 → 임의 함수 구현 가능 (단, 크기 2^n 증가)
+
+**RAM (Read-Write Memory)**
+- Single-port: 주소(a)/데이터입력(di)/데이터출력(do)/쓰기신호(wr) 공유
+- Dual-port: 읽기주소(ao)와 쓰기주소(ai) 분리 → 읽기+쓰기 동시 수행 가능
+- 내부: Read Decoder + Write Decoder + Gated Latch 배열
+  → 쓰기: Write Decoder 활성화 & wr=1 → Latch 열림 → di 저장
+  → 읽기: Read Decoder 활성화 → Latch Q → 버퍼 → do 출력
+- 용도: FIFO, Register File, Cache 등
+
+**PLA (Programmable Logic Array)**
+- 구조: AND 배열(필요한 곱항만 생성) + OR 배열(곱항 선택적 OR)
+- ROM과 차이: ROM=모든 Minterm(2^n개) 생성, PLA=필요한 것만 → 면적 효율↑
+- 같은 Product Term을 여러 출력에서 공유 가능 → 복수 SoP 함수 동시 구현
 
 **MUX/Decoder로 임의 논리 함수 구현**
 - Decoder: 원하는 Minterm들을 OR → `wire f = b[1]|b[3]|b[5]|b[7]`
