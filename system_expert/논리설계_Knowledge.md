@@ -420,11 +420,11 @@ RS Latch → Gated Latch → Master-Slave FF → D Flip-flop
 - Power를 줄이는 주요 두 가지 이유: **발열(thermal)**, **배터리 수명**
 - Clock Gating 두 종류: **ILD** (MUX feedback loop 있는 FF에만 적용), **DTD** (XOR 기반, 범용)
 - DTD의 단점: **XOR overhead** (면적/지연 증가), 완화 방법 연구 중
-- Power Gating: **전원**을 동적으로 차단 → **leakage** 전류 소모 감소
-- DVS: **전압**을 동적으로 변화 → **dynamic** 전류 소모 감소
+- Power Gating: **PDN(전원 공급망)**을 동적으로 차단 → **leakage** 전류 소모 감소
+- DVS: **공급 전압(supply voltage)**을 동적으로 변화 → **dynamic** 전류 소모 감소
 - Power Gating + DVS: **IoT** 관련 제품에 필수적인 설계 요소
-- Power Gating 설계 고려사항: ①**rush current**에 의한 IR-drop ②**state retention**에 따른 설계 overhead
-- DVS 추가 overhead: **DC-DC Converter**의 효율적인 사용 필요
+- Power Gating 설계 고려사항: ①**switching cell**에 의한 IR-drop ②**state retention**에 따른 설계 overhead
+- DVS 추가 overhead: **voltage regulator**의 효율적인 사용 필요
 
 ### Combinational Building Blocks (Chap 8)
 **설계 철학: Divide and Conquer — 블록 조립**
