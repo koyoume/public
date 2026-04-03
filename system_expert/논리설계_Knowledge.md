@@ -1,6 +1,6 @@
 # 논리설계 — 오픈북 시험 참고 문서
 
-> 마지막 업데이트: 2026-03-20 | 완료 챕터: Chap 1.1, 1.2, 2, 3.1, 3.2, 6.1, 8, 10, 11, 14.2, 14.3, 15, 20, 28, 29, Low Power Design
+> 마지막 업데이트: 2026-03-20 | 완료 챕터: Chap 1.1, 1.2, 2, 3.1, 3.2, 6.1, 8, 10, 11, 12.1, 14.2, 14.3, 15, 20, 28, 29, Low Power Design
 > 구성: 수식 모음 → 핵심 비교표 → 용어 정의 → 주제별 상세
 
 ---
@@ -22,6 +22,15 @@
 | Fixed-point 변환: 실수 × 2^f → 반올림 → 이진수 | 고정소수점 변환 |
 | Floating-point: M × 2^(E-Bias) | 부동소수점 값 |
 | 절대 오차 (f비트 Fixed) = 2^(-(f+1)) | 고정소수점 최대 오차 |
+
+### FA / Adders
+| 수식 | 의미 |
+|------|------|
+| S = A ⊕ B ⊕ CI | FA 합(Sum) |
+| CO = AB + B·CI + CI·A | FA 올림수(Carry-out) |
+| A - B = A + B' + 1 | 2의 보수 뺄셈 (Cin=1, B 비트반전) |
+| RCA: Area=O(N), Delay=O(N) | N비트 Ripple Carry Adder |
+| CSA: Area=O(N), Delay=O(1) | N비트 Carry Save Adder |
 
 ### 타이밍 제약 (Timing Constraints)
 | 수식 | 조건 | 비고 |
@@ -192,6 +201,17 @@
 | AND항 수 | 2^n (모든 Minterm) | 2^n | 필요한 것만 |
 | 주요 용도 | 룩업 테이블, 로직 | 데이터 저장 | 복수 SoP 함수 |
 
+### RCA vs CSA
+| 구분 | RCA (Ripple Carry Adder) | CSA (Carry Save Adder) |
+|------|--------------------------|------------------------|
+| 구조 | FA 직렬 연결 | FA 배열, CO 저장 |
+| Carry 전파 | LSB→MSB 순차 전파 | 전파 없음 (저장) |
+| Area | O(N) | O(N) |
+| Delay | O(N) — carry ripple | O(1) — 병렬 처리 |
+| 출력 형태 | 완전한 2진수 | Redundant (S줄+C줄) |
+| 마무리 | 불필요 | 마지막에 CLA 한 번 필요 |
+| 용도 | 단순 2수 덧셈 | 다수 수의 합 (곱셈 내부 등) |
+
 ### Stuck-at Fault 검출 조건
 | 조건 | 설명 |
 |------|------|
@@ -227,6 +247,8 @@
 
 **Characterization (특성화)**: 샘플 칩의 동작 범위·파라미터·노화 특성 측정. NBTI, HCI, 온도 영향 포함.
 
+**CSA (Carry-Save Adder)**: 3개 입력을 CO 전파 없이 (S줄, C줄)로 압축. Area=O(N), Delay=O(1). 마지막에 CLA로 합산.
+
 **Decoder (디코더)**: n비트 이진 → 2^n 비트 One-hot 변환. b=1<<a. 분할 정복으로 대형 디코더 구성.
 
 **DFT (Design For Testability)**: 테스트 용이성을 위한 설계 방법론. Controllability + Observability 향상.
@@ -236,6 +258,8 @@
 **Encoder (인코더)**: One-hot → 이진 코드 변환. Decoder 역방향. 대형: 2단 구성 + any-input-true 출력.
 
 **Essential PI**: 특정 Minterm을 오직 하나의 PI로만 커버할 수 있는 Prime Implicant. 반드시 선택.
+
+**FA (Full Adder, 전가산기)**: 3비트(A,B,CI) 입력 → S=A⊕B⊕CI, CO=AB+B·CI+CI·A. "(3,2) counter"라고도 불림.
 
 **Fault Coverage**: 검출된 Stuck-at Fault 수 / 전체 Fault 수. 테스트 품질 지표. 목표 95~99%.
 
@@ -252,6 +276,8 @@
 **Overflow (오버플로우)**: 2의 보수 연산 결과가 표현 범위 초과. 검출: Carry-in(MSB) XOR Carry-out(MSB) = 1이면 오버플로우.
 
 **PLA (Programmable Logic Array)**: AND 배열 + OR 배열. ROM보다 적은 AND항으로 복수 SoP 함수 구현.
+
+**RCA (Ripple Carry Adder)**: FA N개 직렬 연결. Carry가 LSB→MSB 순차 전파. Area=O(N), Delay=O(N).
 
 **Gray Code**: 인접 값 사이에 1비트만 변화하는 인코딩. 멀티비트 동기화에 사용.
 
@@ -426,8 +452,27 @@ RS Latch → Gated Latch → Master-Slave FF → D Flip-flop
 - Power Gating 설계 고려사항: ①**switching cell**에 의한 IR-drop ②**state retention**에 따른 설계 overhead
 - DVS 추가 overhead: **voltage regulator**의 효율적인 사용 필요
 
+### FA Based Adders (Chap 12.1)
+**FA (Full Adder) 기본**
+- S = A ⊕ B ⊕ CI, CO = AB + B·CI + CI·A
+- "(3,2) counter": 3입력 중 1의 개수를 2진수로 출력 (CO=10의 자리, S=1의 자리)
+
+**RCA (Ripple-Carry Adder)**
+- FA N개 직렬 연결. Carry가 LSB→MSB로 순차 전파
+- Area = O(N), Delay = O(N) — carry chain이 병목
+- Adder/Subtractor: sub=0→덧셈, sub=1→뺄셈 (B XOR sub, Cin=sub)
+- Overflow 검출: Cin(MSB) XOR Cout(MSB) = 1이면 Overflow
+
+**CSA (Carry-Save Adder)**
+- CO를 전파하지 않고 저장 → carry chain 없음
+- 3개 입력 → (SUM줄, CARRY줄) = Redundant Binary Number로 압축
+- Area = O(N), Delay = O(1) ← 핵심 장점
+- 마지막에 CLA 한 번으로 최종 합산
+- 3개 합: CSA(O(1)) + CLA(O(logN)) vs 일반 CLA 2번
+- 뺄셈 처리: a-b-c-d-e = a+b'+c'+d'+e'+4 (비트반전 + 상수 보정)
+- CSA 주요 목적: **critical path 줄이기**
+
 ### Combinational Building Blocks (Chap 8)
-**설계 철학: Divide and Conquer — 블록 조립**
 - Decoder: 이진→One-hot. `b = 1<<a`. 분할: n비트를 k비트씩 나눠 Decoder + AND 조합
 - Encoder: One-hot→이진. Decoder 역방향. 대형: 2단(Low bits + High bits), any-input-true(c=|a) 필요
 - MUX: select 신호로 입력 중 하나 선택. One-hot select: `({k{s[i]}} & ai)` OR. Binary MUX = Decoder + One-hot MUX
