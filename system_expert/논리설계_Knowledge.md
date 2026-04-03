@@ -1,6 +1,6 @@
 # 논리설계 — 오픈북 시험 참고 문서
 
-> 마지막 업데이트: 2026-03-20 | 완료 챕터: Chap 1.1, 1.2, 2, 3.1, 3.2, 6.1, 8, 10, 11, 12.1, 14.2, 14.3, 15, 20, 28, 29, Low Power Design
+> 마지막 업데이트: 2026-03-20 | 완료 챕터: Chap 1.1, 1.2, 2, 3.1, 3.2, 6.1, 8, 10, 11, 12.1, 12.2, 14.2, 14.3, 15, 20, 28, 29, Low Power Design
 > 구성: 수식 모음 → 핵심 비교표 → 용어 정의 → 주제별 상세
 
 ---
@@ -31,6 +31,13 @@
 | A - B = A + B' + 1 | 2의 보수 뺄셈 (Cin=1, B 비트반전) |
 | RCA: Area=O(N), Delay=O(N) | N비트 Ripple Carry Adder |
 | CSA: Area=O(N), Delay=O(1) | N비트 Carry Save Adder |
+| Gi = Ai·Bi | Generate (자체 올림수 생성) |
+| Pi = Ai ⊕ Bi | Propagate (올림수 전파) |
+| Ci+1 = Gi + Pi·Ci | P&G로 재표현한 Carry |
+| Si = Pi ⊕ Ci | P&G로 재표현한 Sum |
+| G_{i:j} = G_{i:k} + P_{i:k}·G_{k-1:j} | Group Generate (블록 결합) |
+| P_{i:j} = P_{i:k} · P_{k-1:j} | Group Propagate (블록 결합) |
+| PPA: Area=O(NlogN), Delay=O(logN) | Parallel Prefix Adder |
 
 ### 타이밍 제약 (Timing Constraints)
 | 수식 | 조건 | 비고 |
@@ -212,6 +219,18 @@
 | 마무리 | 불필요 | 마지막에 CLA 한 번 필요 |
 | 용도 | 단순 2수 덧셈 | 다수 수의 합 (곱셈 내부 등) |
 
+### Adder 종류 종합 비교
+| 종류 | 핵심 아이디어 | Area | Delay |
+|------|-------------|------|-------|
+| RCA | FA 직렬, Carry 순차 전파 | O(N) | O(N) |
+| CLA | Carry 직접 계산 (2단 AND-OR) | O(N) | O(1)* |
+| PPA (Prefix) | 블록 결합 트리 | O(NlogN) | O(logN) |
+| Carry-Skip | 블록 P=1이면 Skip | O(N) | O(√N) |
+| Carry-Select | Cin=0/1 미리 계산 + MUX | O(N) | O(√N) |
+| CSA | CO 저장, 3→2 압축 | O(N) | O(1) |
+
+*CLA: 팬인 제한으로 4~8비트 블록에서 실용적
+
 ### Stuck-at Fault 검출 조건
 | 조건 | 설명 |
 |------|------|
@@ -245,7 +264,13 @@
 
 **Critical Path**: 칩에서 가장 지연이 긴 신호 경로. 최대 동작 주파수를 결정.
 
+**Carry-Select Adder**: 상위 블록을 Cin=0/1 두 경우로 미리 계산 후 MUX로 선택. Delay ≈ O(√N).
+
+**Carry-Skip Adder**: 블록 내 P_{block}=1이면 Carry가 블록을 건너뜀. MUX로 Skip 경로 선택.
+
 **Characterization (특성화)**: 샘플 칩의 동작 범위·파라미터·노화 특성 측정. NBTI, HCI, 온도 영향 포함.
+
+**CLA (Carry Look-ahead Adder)**: P&G로 Carry를 중간 단계 없이 직접 2단 AND-OR로 계산. 팬인 제한으로 4~8비트 블록에서 실용적.
 
 **CSA (Carry-Save Adder)**: 3개 입력을 CO 전파 없이 (S줄, C줄)로 압축. Area=O(N), Delay=O(1). 마지막에 CLA로 합산.
 
@@ -276,6 +301,8 @@
 **Overflow (오버플로우)**: 2의 보수 연산 결과가 표현 범위 초과. 검출: Carry-in(MSB) XOR Carry-out(MSB) = 1이면 오버플로우.
 
 **PLA (Programmable Logic Array)**: AND 배열 + OR 배열. ROM보다 적은 AND항으로 복수 SoP 함수 구현.
+
+**PPA (Parallel Prefix Adder)**: 3단계(Pre-processing→Prefix Tree→Post-processing). G_{i:-1}을 트리로 계산. Area=O(NlogN), Delay=O(logN). Kogge-Stone, Brent-Kung 등 변형 존재.
 
 **RCA (Ripple Carry Adder)**: FA N개 직렬 연결. Carry가 LSB→MSB 순차 전파. Area=O(N), Delay=O(N).
 
@@ -453,7 +480,6 @@ RS Latch → Gated Latch → Master-Slave FF → D Flip-flop
 - DVS 추가 overhead: **voltage regulator**의 효율적인 사용 필요
 
 ### FA Based Adders (Chap 12.1)
-**FA (Full Adder) 기본**
 - S = A ⊕ B ⊕ CI, CO = AB + B·CI + CI·A
 - "(3,2) counter": 3입력 중 1의 개수를 2진수로 출력 (CO=10의 자리, S=1의 자리)
 
