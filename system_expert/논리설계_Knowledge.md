@@ -31,6 +31,18 @@
 | A - B = A + B' + 1 | 2의 보수 뺄셈 (Cin=1, B 비트반전) |
 | RCA: Area=O(N), Delay=O(N) | N비트 Ripple Carry Adder |
 | CSA: Area=O(N), Delay=O(1) | N비트 Carry Save Adder |
+
+### P&G Based Adders
+| 수식 | 의미 |
+|------|------|
+| Gi = Ai · Bi | Carry Generate (A=B=1이면 무조건 올림수) |
+| Pi = Ai ⊕ Bi | Carry Propagate (Cin을 전달) |
+| Ci+1 = Gi + Pi·Ci | Carry 점화식 |
+| Si = Pi ⊕ Ci | Sum |
+| G(i:j) = G(i:k) + P(i:k)·G(k-1:j) | 그룹 Generate 결합 |
+| P(i:j) = P(i:k) · P(k-1:j) | 그룹 Propagate 결합 |
+| CLA C4 = G3+P3G2+P3P2G1+P3P2P1G0+P3P2P1P0C0 | 4비트 CLA 전개 |
+| PPA: Delay = O(log N) | Parallel Prefix Adder |
 | Gi = Ai·Bi | Generate (자체 올림수 생성) |
 | Pi = Ai ⊕ Bi | Propagate (올림수 전파) |
 | Ci+1 = Gi + Pi·Ci | P&G로 재표현한 Carry |
@@ -219,6 +231,15 @@
 | 마무리 | 불필요 | 마지막에 CLA 한 번 필요 |
 | 용도 | 단순 2수 덧셈 | 다수 수의 합 (곱셈 내부 등) |
 
+### Adder 전체 비교 (P&G Based)
+| 구분 | RCA | CLA | PPA | Carry-Skip | Carry-Select |
+|------|-----|-----|-----|-----------|-------------|
+| Delay | O(N) | O(1)* | O(log N) | O(√N) | O(√N) |
+| Area | O(N) | O(N) | O(N log N) | O(N) | O(N) |
+| 구조 | FA 직렬 | 2단 AND-OR | Prefix Tree | 블록+Skip MUX | 블록×2+MUX |
+| 특징 | 단순 | fanin↑ | 빠름, 배선복잡 | 면적 효율 | 속도/면적 균형 |
+*CLA: fanin 급증으로 소규모에만 실용적
+
 ### Adder 종류 종합 비교
 | 종류 | 핵심 아이디어 | Area | Delay |
 |------|-------------|------|-------|
@@ -268,7 +289,13 @@
 
 **Carry-Skip Adder**: 블록 내 P_{block}=1이면 Carry가 블록을 건너뜀. MUX로 Skip 경로 선택.
 
+**Carry-Select Adder**: 상위 블록을 Cin=0, Cin=1 두 경우 동시 계산 → Cin 확정 시 MUX 선택. Delay=O(√N).
+
+**Carry-Skip Adder**: P(i-1:k)=1이면 Cin이 블록 전체 Skip. Delay=O(√N). 면적 효율적.
+
 **Characterization (특성화)**: 샘플 칩의 동작 범위·파라미터·노화 특성 측정. NBTI, HCI, 온도 영향 포함.
+
+**CLA (Carry Look-ahead Adder)**: Carry를 원래 입력(P, G)에서 직접 계산. 2단 AND-OR 논리. Delay=O(1) 이론적, fanin 증가 한계.
 
 **CLA (Carry Look-ahead Adder)**: P&G로 Carry를 중간 단계 없이 직접 2단 AND-OR로 계산. 팬인 제한으로 4~8비트 블록에서 실용적.
 
@@ -497,6 +524,41 @@ RS Latch → Gated Latch → Master-Slave FF → D Flip-flop
 - 3개 합: CSA(O(1)) + CLA(O(logN)) vs 일반 CLA 2번
 - 뺄셈 처리: a-b-c-d-e = a+b'+c'+d'+e'+4 (비트반전 + 상수 보정)
 - CSA 주요 목적: **critical path 줄이기**
+
+### P&G Based Adders (Chap 12.2)
+**P&G 기본 정의**
+- Gi = Ai·Bi (Generate: A=B=1이면 무조건 Carry 생성, Cin 불필요)
+- Pi = Ai⊕Bi (Propagate: Cin을 Cout으로 전달)
+- Ci+1 = Gi + Pi·Ci, Si = Pi ⊕ Ci
+
+**CLA (Carry Look-ahead Adder)**
+- Carry를 원래 입력(P,G)에서 직접 전개 → 중간 Carry 대기 없음
+- 예: C4 = G3+P3G2+P3P2G1+P3P2P1G0+P3P2P1P0C0
+- 2단 AND-OR, Delay=O(1) 이론적
+- 단점: Cn의 fanin = 2n+1 → N 커질수록 fanin 급증 → 소규모에만 실용적
+
+**Group P&G (블록 결합)**
+- G(i:j) = G(i:k) + P(i:k)·G(k-1:j)
+- P(i:j) = P(i:k)·P(k-1:j)
+- 블록들을 재귀적으로 결합 → Prefix Tree 구성 가능
+
+**PPA (Parallel Prefix Adder)**
+- 3단계: ①Pi,Gi 계산 ②Prefix Tree로 G(i:-1) 계산(=Ci+1) ③Si=Pi⊕Ci
+- 2단계 구조에 따라 이름이 달라짐
+  - Kogge-Stone: 빠름(log N), 배선 복잡, 면적 큼
+  - Brent-Kung: 면적 작음, 약간 느림
+- Delay=O(log N), Area=O(N log N)
+- 이론적으로 N-bit adder delay를 log₂N에 비례하도록 구현 가능
+
+**Carry-Skip Adder**
+- P(i-1:k)=0 → 블록 내에서 Carry 생성 (일반 동작)
+- P(i-1:k)=1 → Cin이 블록 전체를 Skip (MUX로 우회)
+- Delay=O(√N), 면적 효율적
+
+**Carry-Select Adder**
+- 상위 블록을 Cin=0, Cin=1 두 경우 동시 계산 (중복 하드웨어)
+- 하위 Carry 확정 시 MUX로 올바른 결과 선택
+- Delay=O(√N), Carry-Skip보다 구현 단순
 
 ### Combinational Building Blocks (Chap 8)
 - Decoder: 이진→One-hot. `b = 1<<a`. 분할: n비트를 k비트씩 나눠 Decoder + AND 조합
