@@ -1,6 +1,6 @@
 # 논리설계 — 오픈북 시험 참고 문서
 
-> 마지막 업데이트: 2026-03-20 | 완료 챕터: Chap 1.1, 1.2, 2, 3.1, 3.2, 6.1, 8, 10, 11, 12.1, 12.2, 14.2, 14.3, 15, 20, 28, 29, Low Power Design
+> 마지막 업데이트: 2026-03-20 | 완료 챕터: Chap 1.1, 1.2, 2, 3.1, 3.2, 6.1, 8, 10, 11, 12.1, 12.2, 14.2, 14.3, 15, 20, 28, 29, Low Power Design, FSM Modeling, Multipliers
 > 구성: 수식 모음 → 핵심 비교표 → 용어 정의 → 주제별 상세
 
 ---
@@ -154,17 +154,28 @@
 | next state 수식 | 카르노맵 필요 | 전이도에서 직접 읽음 |
 | 주요 사용처 | 상태 많은 FSM, ASIC | 상태 적은 FSM, FPGA |
 
-### Moore vs Mealy FSM
-| 구분 | Moore Machine | Mealy Machine |
-|------|--------------|---------------|
-| 출력 결정 | f(state) | f(state, input) |
-| 출력 표기 위치 | 상태 원 안 | 전이 화살표 위 |
-| 출력 변화 시점 | 클럭 엣지 후 | 입력 변화 즉시 |
-| 안정성 | 글리치 없음 ✅ | 입력 글리치 전파 가능 |
-| 반응 속도 | 1클럭 지연 | 즉각 반응 |
-| 상태 수 | 상대적으로 많음 | 상대적으로 적음 |
-| Verilog 출력 위치 | 별도 assign | next state와 같은 always |
-| 사용 빈도 | 많음 (안정적) | 속도 중요 시 |
+### Moore vs Mealy vs Synchronous Mealy
+| 구분 | Moore | Mealy | Synchronous Mealy |
+|------|-------|-------|-------------------|
+| 출력 결정 | f(state) | f(state, input) | f(state, input) |
+| 출력 동기화 | 비동기 (조합 출력) | 비동기 (즉각 반응) | 동기 (FF 거침) ✅ |
+| 입력 글리치 반응 | 없음 ✅ | 있음 (전파) | 없음 ✅ |
+| 상태 수 | 많음 | 적음 | 적음 |
+| 상태도 표기 | 원 안에 출력 | 화살표에 입력/출력 | 화살표에 입력/출력 |
+| 변환 | — | — | Output-oriented assignment로 Moore→변환 가능 |
+
+### Sequential vs Parallel Multiplier
+| 구분 | Sequential | Parallel |
+|------|-----------|---------|
+| 회로 크기 | 작음 | 큼 |
+| 소요 시간 | 많이 걸림 | 적게 걸림 |
+| 구조 | 반복 shift+add | AND배열+CSA트리+Final Adder |
+
+### 상수 곱셈 최적화 방법
+| 방법 | 적용 조건 | 변환 예시 |
+|------|---------|---------|
+| Shift-and-Add | 1이 적게 분포 | a×36 = (a<<5)+(a<<2) |
+| Canonical Encoding | 1이 연속 분포 | a×62 = (a<<6)-(a<<1) |
 
 ### Verilog 핵심 구분
 | 구분 | wire | reg |
@@ -289,6 +300,8 @@
 
 **Carry-Skip Adder**: 블록 내 P_{block}=1이면 Carry가 블록을 건너뜀. MUX로 Skip 경로 선택.
 
+**Canonical Encoding**: 연속된 1의 블록을 (상위+1) - 하위로 변환해 1의 개수 감소. 상수 곱셈 최적화에 사용.
+
 **Carry-Select Adder**: 상위 블록을 Cin=0, Cin=1 두 경우 동시 계산 → Cin 확정 시 MUX 선택. Delay=O(√N).
 
 **Carry-Skip Adder**: P(i-1:k)=1이면 Cin이 블록 전체 Skip. Delay=O(√N). 면적 효율적.
@@ -341,11 +354,15 @@
 
 **IR Drop**: 전원 배선의 저항으로 인한 전압 강하. Power Integrity 문제.
 
+**Implication Chart Method**: 두 상태를 합칠 수 있는지 체계적으로 판별하는 State Minimization 기법. 출력이 다른 쌍은 X, 조건 실패 시 연쇄적으로 X 처리.
+
 **Mealy Machine**: 출력 = f(state, input). 전이 화살표에 출력 표기. 즉각 반응, 상태 수 적음. 글리치 가능.
 
 **Metastability**: Setup/Hold 위반 시 FF가 0도 1도 아닌 불법 중간 상태에 빠지는 현상. 제거 불가, 확률만 줄일 수 있음.
 
 **Moore Machine**: 출력 = f(state). 상태 원 안에 출력 표기. 클럭 동기 출력, 글리치 없음. 신호등 FSM이 대표 예.
+
+**Synchronous Mealy FSM**: Mealy 출력을 FF를 통해 동기화. 비동기 출력 문제 해결. Output-oriented Assignment로 Moore에서 변환 가능.
 
 **Minterm (mₙ)**: 모든 변수가 정확히 한 번 등장하는 AND항. n번 Minterm = 이진수 n에 해당하는 입력 조합.
 
@@ -468,6 +485,46 @@ RS Latch → Gated Latch → Master-Slave FF → D Flip-flop
 - Mealy 장점: 1클럭 빠른 반응, 상태 수 적음
 - Verilog: Moore는 출력을 별도 assign, Mealy는 next state와 같은 always 블록
 - 신호등 FSM = Moore (출력이 상태만으로 고정, carew는 next state에만 영향)
+
+### FSM Modeling & Synthesis (추가자료)
+**FSM 설계 5단계**
+1. 문제 이해 → 2. State Diagram 작성 → 3. State Minimization → 4. State Assignment → 5. 회로 구현(Boolean eq/K-map)
+- 가장 중요한 단계: State Diagram 정확히 도출
+
+**Moore vs Mealy vs Synchronous Mealy**
+- Moore: 출력=f(state), 비동기 조합 출력, 글리치 없음
+- Mealy: 출력=f(state,input), 입력에 즉각 반응(비동기), 글리치 가능
+- Synchronous Mealy: Mealy 출력 뒤에 FF 추가 → 동기화, 비동기 문제 해결
+- Output-oriented Assignment: 출력을 state bit로 재사용 → Moore를 Sync Mealy로 변환
+
+**State Minimization — Implication Chart Method**
+- 두 상태 합칠 조건: ①모든 입력에 출력 동일 ②next state 쌍도 합칠 수 있음
+- 표 작성 → 출력 다른 쌍 X → 조건 실패 연쇄 X → 남은 쌍 = 합칠 수 있는 쌍
+
+**State Assignment 방법 3가지**
+- Binary (Gray Code): ⌈log₂n⌉비트, Heuristic 규칙으로 인접 배정
+- One-Hot: n비트, 인코딩 쉬움, FPGA 적합, 대규모 FSM에 비실용적
+- Output-oriented: 출력 신호를 state bit로 재사용, Synchronous Mealy와 연결
+
+### Multipliers (추가자료)
+**곱셈 기본 원리**
+- A × B = Σ (A AND B[i]) << i (Shift-and-Add)
+- n비트 × n비트 → n² 개의 1비트 Partial Product
+- 결과: 2n 비트
+
+**Parallel Multiplier 구조**
+- ① AND 배열: 모든 Ai·Bj 계산 (n² AND 게이트)
+- ② CSA 트리(Compressor): 같은 비트 위치의 부분곱을 3개씩 묶어 압축 → O(log N) 층
+- ③ Final Adder(CLA): 마지막 2개 수 합산
+
+**Sequential vs Parallel**
+- Sequential: 회로 작음, 시간 많이 걸림
+- Parallel: 회로 큼, 시간 적게 걸림
+
+**상수 곱셈 최적화**
+- Shift-and-Add: 1이 적게 분포 시 → (a<<bit위치)들의 합. **변수 입력** 곱셈에 효과적
+- Canonical Encoding: 1이 연속 시 상위+1 - 하위로 변환 → 1의 개수 감소. **상수 입력** 곱셈에 효과적
+  예: a×62 = a×64 - a×2 = (a<<6) - (a<<1) = (a<<6) + ~(a<<1) + 1
 
 ### FSM 설계 전체 흐름 (Chap 14.3)
 ```
