@@ -313,6 +313,30 @@
 - **무어의 법칙**: 2년마다 트랜지스터 2배. 한계: 전력 위기, 누설 전류, 전압 스케일링 어려움
 - **FinFET**: 3D 트랜지스터 구조로 누설 전류 감소. 22nm 공정부터 도입
 
+```
+[NMOS 단면]                [PMOS 단면]
+      G                          G
+      |                          |
+  [SiO2]                     [SiO2]
+  N+    N+   ← 채널          P+    P+   ← 채널
+  S      D                   S      D
+  └──P기판──┘                └──N기판──┘
+  Vg>Vth → ON               Vg<Vth → ON
+
+[인버터]    [NAND2]         [NOR2]
+  VDD         VDD             VDD
+   |          |  |            |    |
+ [PMOS]    [PA][PB] ←병렬  [PA]─[PB] ←직렬
+   |          |  |            |    |
+ A─+─Y      A─+ +─B─Y       A─+──+─B─Y
+   |          |                   |
+ [NMOS]    [NA] ←직렬        [NA][NB] ←병렬
+   |          |                |    |
+  GND       [NB]              GND  GND
+              |
+             GND
+```
+
 ### Ch2. MOSFET Device Characteristics
 
 - **에너지 밴드**: 전도 밴드(Ec, 자유 전자) ↔ 가전자 밴드(Ev, 묶인 전자). 사이 = 금지 구역(Eg=1.12eV for Si)
@@ -325,6 +349,40 @@
 - **속도 포화**: 단채널에서 Ids가 (Vgs−Vt)² → (Vgs−Vt) 선형으로 변화
 - **서브스레숄드 한계**: 60 mV/decade는 CMOS의 근본 장벽. 돌파 시도: 터널 FET, NC-FET
 - **접합 커패시턴스**: 역방향 바이어스 유지 필수. 바닥면+측벽으로 구성
+
+```
+[MOS 커패시터 3단계]
+Vg=VFB         Vg>VFB          Vg>VTH
+  G               G                G
+  |               |                |
+[SiO2]         [SiO2]           [SiO2]
+[P기판 균일]   [공핍층 Wd]      [반전층 채널]  ← N채널 생성!
+               [P기판]          [공핍층]
+                                [P기판]
+
+[I-V 특성 그래프]
+ Ids
+  |         Vgs=2.5V ─────────────── (포화)
+  |        /
+  |       / Vgs=2.0V ─────────────
+  |      /           /
+  |     /  Vgs=1.5V ──────────
+  |    /            /
+  |   /   Vgs=1.0V ──────
+  |  /             /
+  | /선형영역      /
+  |/______________/____________ Vds
+  0          Vds=Vgs-Vt (포화 경계선)
+
+[서브스레숄드 특성 (로그 스케일)]
+log(Ids)
+  |                    /  선형
+  |                  /
+  |               /    S = 60~100mV/dec
+  |            /  ← 서브스레숄드 전류
+  |__________/______________ Vgs
+             Vth
+```
 
 ### Ch3. CMOS Circuit Basics
 
@@ -339,6 +397,44 @@
 - **직렬 N개 → W를 N배**: NAND N입력의 PDN이 직렬 N개이므로 각 NMOS W를 N배로
 - **인버터 체인 최적 비율**: 각 단 크기 등비수열. 최적 α ≈ e ≈ 2.7, 실용적 단수 3~4
 
+```
+[VTC 곡선]                      [노이즈 마진]
+Vout                            VOH ─────────────────
+VDD ─────╮                           ↑ NMH = VOH-VIH
+         |  A  B  C  D  E      VIH ─ ─ ─ ─ ─ ─ ─ ─ ─
+         |     ╲                     불확정 영역
+         |      ╲                    (VIL~VIH)
+         |       ╲            VIL ─ ─ ─ ─ ─ ─ ─ ─ ─
+  0 ─────╯        ╰────             ↓ NML = VIL-VOL
+  0   Vtn  VDD/2  VDD   Vin  VOL ─────────────────
+
+[RC 지연 모델]          [인버터 체인]
+  VDD                  Wi─[×1]─[×4]─[×16]─64Wi
+   |                        ↑     ↑      ↑
+  [Rp]  ← PMOS ON저항       등비수열 (α=4)
+   |
+   +──── Vout
+   |
+  [CL]  ← 부하
+   |
+  GND    tpLH = 0.69×Rp×CL
+
+[NAND2 사이징]
+  VDD
+   |
+[PMOS 2W][PMOS 2W] ← 병렬
+   |          |
+ A─+         +─B
+    \       /
+     +──Y──+
+     |
+  [NMOS 2W] ← A  직렬
+     |
+  [NMOS 2W] ← B  (직렬이므로 W×2)
+     |
+    GND
+```
+
 ### Ch4. Logical Effort
 
 - **기생 커패시턴스 포함 지연**: td = td0·(γ + f). γ = Cpar/Cin ≈ 1 (인버터). γ가 최소 고유 지연
@@ -349,6 +445,30 @@
 - **최적 단당 effort**: ≈ 4 (γ=0), ≈ 3.6 (γ=1)
 - **분기 노력 B**: 분기가 있으면 off-path 부하도 구동 → PE 증가 → 지연 증가
 - **LE 한계**: 인터커넥트 무시, 지연만 최적화(전력·면적 제외), 균일 분기 가정, 입력 슬루 무시
+
+```
+[LE 계산 예시]
+인버터: Cin = PMOS(2W)+NMOS(W) = 3Cg  → LE = 3/3 = 1
+NAND2: Cin = PMOS(2W)+NMOS(2W) = 4Cg  → LE = 4/3
+NOR2:  Cin = PMOS(4W)+NMOS(W)  = 5Cg  → LE = 5/3
+
+[Path Effort 예시]
+  1 ─[INV]─ X ─[NAND2]─ Y ─[NOR2]─ Z ─[INV]─ 256
+  LE=1       LE=4/3         LE=5/3     LE=1
+
+G  = 1 × 4/3 × 5/3 × 1 = 20/9
+EF = 256/1 = 256
+PE = G × EF = (20/9) × 256
+
+최적 단당 effort: f̂ = PE^(1/4)
+뒤에서 앞으로 크기 결정:
+  Cin_last = Cout × LE / f̂
+
+[분기 노력]
+Wi ─[단1]─ W1 ─[단2]─ W2 ─→ 64Wi (on-path)
+                  └──────────→ W2' (off-path)
+b = (W2 + W2') / W2
+```
 
 ### Ch5. Interconnect Wire
 
@@ -364,6 +484,32 @@
 - **리피터 효과**: N 구간 분할 → 지연 L²→L로 개선. 단, 전력 증가 트레이드오프
 - **글로벌 배선**: 공정 스케일링으로 길이 안 줄어듦 + 저항 증가 → 지연 악화. 리피터 삽입 주요 대상
 
+```
+[배선 단면 구조]
+  ←W→
+  ┌───┐ ↑H(두께)     AR = H/W
+  │   │ ↓            R = R□ × (L/W)
+──┴───┴──────────    R□ = ρ/H
+  ←T→ (절연층)       C = εdi·WL/T
+
+[RC 모델 비교]              [Elmore 지연 RC 트리]
+L형: R→C        지연=RC     소스─R1─R2─Ri─노드i
+π형: C/2→R→C/2 지연=RC/2         │   │   │
+T형: R/2→C→R/2 지연=RC/2        C1  C2  Ci Cj
+분산RC:          지연=RC/2
+                              TDi = R1(C1+C2+Ci+Cj)
+                                  + R2(C2+Ci+Cj)
+                                  + Ri(Ci+Cj)
+
+[리피터 삽입]
+긴 배선 (지연 ∝ L²):
+[드라이버]────────────────────────[수신단]
+
+리피터 삽입 (지연 ∝ L):
+[드라이버]──[REP]──[REP]──[REP]──[수신단]
+           L/N    L/N    L/N
+```
+
 ### Ch6. Clocking Elements
 
 - **D-Latch**: CLK=1 → 투명(D=Q), CLK=0 → 불투명(Q 유지). 레벨 감지 래치
@@ -376,6 +522,36 @@
 - **Pulsed Latch**: Tpw만큼 최대 tpd 연장(Time Borrowing). 동시에 최소 tcd 조건 강화
 - **Two-Phase Latch**: Setup overhead 없음. Time Borrowing = Tc/2 − tsetup. 매 Tc/2마다 Hold 조건 검사
 - **Time Borrowing 의미**: 래치 투명 구간 동안 늦게 도착한 데이터도 통과 가능 → 느린 경로 허용
+
+```
+[D Flip-Flop 구조 (마스터-슬레이브)]
+         CLKb          CLK
+D ─→[D-Latch L1]─N1─→[D-Latch L2]─→ Q
+    (CLK=0: 투명)    (CLK=1: 투명)
+    (CLK=1: 불투명)  (CLK=0: 불투명)
+→ Q는 CLK 상승 에지 순간의 D값만 저장
+
+[Setup/Hold Time 타이밍]
+D   ──[안정구간]──[새값]──────
+         ↑           ↑
+     tsetup전     thold후
+         │               │
+CLK ─────┼───────────────┼─
+         ↑ 상승 에지 기준
+
+[FF 파이프라인 타이밍]
+Q1──[조합논리 CL]──D2
+Tc ≥ tpcq + tpd + tsetup   (최대 지연)
+tcd + tccq ≥ thold          (최소 지연)
+
+[Two-Phase Latch Time Borrowing]
+CLK  ─┐     ┌─────────
+      └─────┘  Tc/2
+CLKb ─────┐     ┌─────
+          └─────┘
+Q1 ────────(느리게 도착)──→
+                    ↑ tborrow = Tc/2 - tsetup
+```
 
 ### Ch7. Dynamic Circuits
 
@@ -393,6 +569,53 @@
 - **현재 위치**: 정적 CMOS에 밀림. 메모리 읽기/쓰기 경로(와이드 OR 구조)에 주로 사용
 - **전력 문제**: 매 사이클 프리차지 스위칭 → 정적 CMOS보다 스위칭 활동 높음
 
+```
+[Unfooted vs Footed 다이나믹]
+  Unfooted:           Footed:
+    VDD                 VDD
+     |                   |
+  [PMOS,CLK=0]       [PMOS,CLK=0]  ← 프리차지
+     |                   |
+     Y                   Y
+     |                   |
+  [NMOS PDN]          [NMOS PDN]   ← 논리
+     |                   |
+    GND              [NMOS,CLK=1]  ← 풋 트랜지스터
+                         |
+                        GND
+
+[도미노 로직]
+    VDD
+     |
+  [PMOS,CLK=0]
+     |
+     X ──→ [INV] ──→ Y(출력)
+     |           ↑
+  [PDN]      Keeper(약한PMOS)
+     |
+    GND
+프리차지: X=1 → Y=0
+평가:     X=0 또는 1 → Y=1 또는 0
+출력은 항상 0→1 방향만 가능
+
+[전하 공유 문제 및 해결]
+  문제:                   해결:
+   VDD                    VDD
+    |                      |
+ [PMOS]                [PMOS]
+    |                      |
+    X2(C2=VDD)             X2
+    |                      |
+ [NMOS A=1]            [NMOS A=1]
+    |                      |
+    X1(C1=0) ←부동        X1 ← [약한PMOS 프리차지]
+    |                      |
+ [NMOS B=0]            [NMOS B=0]
+    |                      |
+   GND                    GND
+V(X2)=VDD×C2/(C1+C2)   X1도 VDD로 프리차지 → 공유 없음
+```
+
 ### Ch8. Memory Cell Operations
 
 - **DRAM 구조**: 1T-1C. WL=1로 NMOS 켜서 BL↔C_cell 연결. C_cell 전하가 데이터
@@ -409,6 +632,46 @@
 - **Flash 내구성 제한**: 고전압 반복으로 터널 산화막 열화 → 통상 10,000~100,000회
 - **NAND 구조**: 셀 직렬 연결 → 고밀도. 선택 셀=Vread(0V), 비선택 셀=Vpass(4-5V 강제 통과)
 - **NOR 구조**: 셀 병렬 연결 → 임의 접근, XIP 가능. 펌웨어·부팅 코드 저장
+
+```
+[DRAM 1T-1C 셀]
+  WL ──┤NMOS├──── BL
+            |
+         [C_cell]  ← 전하 저장
+            |
+           GND
+
+읽기: BL 플로팅 → WL=1 → 전하 공유
+ΔVbl = ±Ccell·VDD/2 / (Cbl+Ccell)  (매우 작음)
+
+[Flash 셀 단면]
+  컨트롤 게이트 (외부 접근 가능)
+       |
+  [인터폴리 유전체]
+  [플로팅 게이트]  ← 전자 저장, 완전 절연
+  [터널링 산화막] (~10nm)
+  N+──────────────N+
+  S     P기판      D
+
+FG에 전자 있음 → Vth↑ → 읽기전류 없음 → "0"
+FG에 전자 없음 → Vth↓ → 읽기전류 있음 → "1"
+
+[NAND vs NOR Flash 구조]
+NAND (직렬):           NOR (병렬):
+BL                     BL
+|                      |──[셀1]──WL1
+[DSL]                  |──[셀2]──WL2
+|                      |──[셀3]──WL3
+[셀3]─WL3              GND
+|
+[셀2]─WL2  ← 선택 셀: Vread=0V
+|            비선택 셀: Vpass=4~5V
+[셀1]─WL1
+|
+[SSL]
+|
+SL(GND)
+```
 
 ### Ch9. SRAM Design
 
@@ -430,6 +693,59 @@
 - **Read SNM < Standby SNM**: 읽기 시 XR이 Q 노드 교란 → VTC 비대칭 → 눈 좁아짐 → 읽기가 안정성 병목
 - **Random Vt Fluctuation**: 공정 미세화 → Vt 불균일 심화 → 극단적 경우 셀이 단안정(Mono-stable)으로 전락
 - **8T SRAM**: 읽기 포트(RWL/RBL) 분리 → 읽기 시 저장 노드 교란 없음 → Read SNM = Standby SNM. 면적↑ 대가
+
+```
+[6T SRAM 셀]
+BL          BLb
+|            |
+[XL]        [XR]  ← WL로 제어
+|            |
+Q ──┬──[PL+NL]──→ Qb ──┬──[PR+NR]──→ Q
+    |    ↑                |    ↑
+   VDD  GND              VDD  GND
+   (PL) (NL)             (PR) (NR)
+
+       WL ─────────────────────────
+
+읽기: BL=BLb=VDD → WL=1 → Q=0이면 BL 방전 → ΔV
+쓰기: BL=0, BLb=1 → WL=1 → XL이 PL을 이겨야 함
+
+[SNM 눈(Eye) 다이어그램]
+Qb
+1.0│╮         STANDBY
+   │ ╲  ┌───╮   ← 눈 넓음
+   │  └─┤   │
+   │    └─╮ │
+   │      ╰─╯  READ  ← 눈 좁음 (XR이 Q 교란)
+0.0└──────────── Q
+   0.0        1.0
+   SNM = 내접 정사각형 한 변
+
+[8T SRAM 셀]
+쓰기 포트:
+WWL ─[XL]─ Q ─[XR]─ Qb
+WBL              WBLb
+
+읽기 포트 (저장 노드 교란 없음):
+Q ──┤RN1├──[RN2]── RBL
+    (게이트)
+RWL ──────────────
+
+[클럭드 센스 앰프]
+BL    BLb
+|      |
+[격리 트랜지스터]  ← sense_clk으로 제어
+|      |
+bit  bit_b
+|      |
+[N1]  [N2]  ← 입력 차동 쌍
+|      |
+[재생 피드백 루프]  ← 작은 차이 → rail-to-rail 증폭
+|
+sense_clk
+|
+GND
+```
 
 ---
 
