@@ -680,6 +680,31 @@ RS Latch → Gated Latch → Master-Slave FF → D Flip-flop
 - STA (Static Timing Analysis): 패턴 없이 모든 경로 타이밍 수학적 분석. False Path 오보고 한계
 - Formal Verification: 수학적 증명, 패턴 불필요, 소규모 블록 적합
 
+**DFT (Design For Testability) 기법 목록 ★**
+```
+목적: 제조된 칩의 내부 상태를 외부에서 제어(Controllability)하고
+      관측(Observability)할 수 있게 하여 테스트 품질을 높임
+
+기법 1: Scan Chain
+  목적: 순차 논리(FF)를 조합 논리처럼 테스트
+  방법: FF들을 직렬 체인으로 연결 → Scan-in으로 원하는 상태 주입 → 1클럭 → Scan-out으로 결과 읽기
+  효과: 모든 FF 상태 직접 제어/관측 가능
+
+기법 2: ATPG (Automatic Test Pattern Generation)
+  목적: Stuck-at Fault를 검출하는 테스트 패턴 자동 생성
+  방법: Sensitization(결함값의 반대 인가) + Propagation(출력까지 전달)
+  효과: 수동 테스트 불필요, Fault Coverage 수치화
+
+기법 3: BIST (Built-In Self Test)
+  목적: 칩 스스로 자가진단 → 외부 테스트 장비 불필요
+  RAM BIST: March Algorithm (0쓰기→읽기→1쓰기→읽기 순환)
+  Logic BIST: LFSR(패턴생성) + Scan + MISR(서명압축) → Pass/Fail
+
+기법 4: Boundary Scan (JTAG)
+  목적: 칩 간 연결(PCB 보드) 테스트
+  방법: 각 핀에 Scan 셀 추가 → 핀 상태 직렬로 제어/관측
+```
+
 **Test (제조 테스트) — 제조 후 전수**
 - Stuck-at Fault: SA0(항상 0 고착)/SA1(항상 1 고착) → 실제 제조 결함과 유사
 - Fault 검출 조건: Sensitization(결함값 반대 인가) + Propagation(출력까지 전달)
@@ -693,6 +718,157 @@ RS Latch → Gated Latch → Master-Slave FF → D Flip-flop
 - 동작 범위: 전원 전압 범위, 클럭 주파수 범위
 - Critical Parameters: V-I 곡선, 전력, 지연, 동작 코너
 - 가속 수명 시험: NBTI(PMOS 역바이어스 열화), HCI(고전계 전자 포획), 온도
+
+### BDD (Binary Decision Diagram) — 정의 + 작성법 + 예제 ★★
+
+**정의**
+```
+논리 함수를 트리(DAG) 구조로 표현하는 자료구조
+변수 순서를 고정하고 Shannon Expansion을 반복 적용
+ROBDD(Reduced Ordered BDD): 중복 제거 → 유일한 표현 보장
+```
+
+**Shannon Expansion (작성 원리)**
+```
+f(x1, x2, ...) = x1'·f(0, x2, ...) + x1·f(1, x2, ...)
+
+→ 변수 x1을 기준으로 두 하위 함수로 분리
+→ 각 하위 함수에 대해 재귀적으로 반복
+→ 최종적으로 0 또는 1 리프 노드에 도달
+```
+
+**BDD 작성 예제: f = AB + C ★**
+```
+변수 순서: A → B → C
+
+Step 1: A로 Shannon Expansion
+  f = A'·(0·B + C) + A·(1·B + C)
+    = A'·(C)      + A·(B + C)
+
+  A=0: f = C
+  A=1: f = B + C
+
+Step 2: A=1 경우를 B로 전개
+  B=0: f = C
+  B=1: f = 1
+
+Step 3: 트리 구성
+         [A]
+        /    \
+      0/      \1
+      [C]     [B]
+      / \    /   \
+    0/ 1\ 0/    \1
+    0   1  [C]   1
+           / \
+         0/   \1
+         0     1
+
+Step 4: ROBDD로 최적화 (동일 서브트리 공유)
+         [A]
+        /    \
+      0/      \1
+      [C]←───[B]
+      / \    /   \
+    0/ 1\ 0/    \1
+    0   1  (C공유)  1
+```
+
+**BDD 특성**
+```
+유일성:  같은 변수 순서면 같은 함수는 항상 같은 BDD
+         → 등가 검증에 핵심 (두 회로의 BDD가 같으면 동일 함수)
+효율성:  중복 공유(DAG)로 지수 폭발 억제
+EDA 활용: 합성, 검증, 최적화 도구에서 내부 함수 표현에 사용
+변수 순서의 중요성:
+         좋은 순서 → BDD 크기 작음
+         나쁜 순서 → BDD 크기 지수적 증가
+```
+
+### 주요 회로도 (ASCII) ★★
+
+**Full Adder (FA)**
+```
+   A ──┬──[XOR]──┬──[XOR]── S
+   B ──┘         │  CI ─────┘
+       └──[AND]──┤
+   B ─┬──[AND]──[OR]── CO
+   CI─┘
+   A ─┬──[AND]──┘
+   CI─┘
+(간략): CO = AB + B·CI + A·CI
+        S  = A ⊕ B ⊕ CI
+```
+
+**4비트 RCA**
+```
+A[0]B[0]  A[1]B[1]  A[2]B[2]  A[3]B[3]
+  ↓↓        ↓↓        ↓↓        ↓↓
+Cin→[FA0]→[FA1]→[FA2]→[FA3]→Cout
+      ↓      ↓      ↓      ↓
+    S[0]   S[1]   S[2]   S[3]
+```
+
+**2:4 Decoder**
+```
+a1 a0
+ │  │
+ ├──┼──[AND(a1' a0')]── b0
+ ├──┼──[AND(a1' a0 )]── b1
+ ├──┼──[AND(a1  a0')]── b2
+ └──┴──[AND(a1  a0 )]── b3
+
+Verilog: wire [3:0] b = 1 << a;
+```
+
+**4:2 Encoder**
+```
+a3 a2 a1 a0
+ │  │  │  │
+ ├──┴──┘  └──[OR]── b0  (b0 = a3|a1)
+ └──┴────────[OR]── b1  (b1 = a3|a2)
+```
+
+**4:1 MUX (One-hot select)**
+```
+s = 0001: b = a0
+s = 0010: b = a1     b = (s[0]&a0) | (s[1]&a1) | (s[2]&a2) | (s[3]&a3)
+s = 0100: b = a2
+s = 1000: b = a3
+```
+
+**Arbiter (LSB 우선)**
+```
+r[3] r[2] r[1] r[0]
+  │    │    │    │
+  │    │    │    └──[AND]←c[0]=1  → g[0]
+  │    │    │         ↓c[1]=!r[0]
+  │    │    └──[AND]←┘           → g[1]
+  │    │         ↓c[2]=!r[1]&c[1]
+  │    └──[AND]←┘                → g[2]
+  │         ↓c[3]
+  └──[AND]←┘                     → g[3]
+
+g = r & c   (c: carry chain)
+```
+
+**D Flip-Flop 타이밍**
+```
+CLK  ____/‾‾‾‾‾‾\____
+          ↑ 클럭 엣지
+D    ─[tsu]─╳─[th]─
+Q              ──[tCQ]──새값
+```
+
+**Scan Chain**
+```
+일반 모드:        Scan 모드:
+D→[FF]→Q    →   SI→[FF]→SO (직렬 체인)
+
+FF1→FF2→FF3→...→FFn
+↑                    ↓
+Scan-In          Scan-Out
+```
 
 ---
 
