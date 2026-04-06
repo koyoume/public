@@ -158,11 +158,10 @@
 | 구분 | Moore | Mealy | Synchronous Mealy |
 |------|-------|-------|-------------------|
 | 출력 결정 | f(state) | f(state, input) | f(state, input) |
-| 출력 동기화 | 비동기 (조합 출력) | 비동기 (즉각 반응) | 동기 (FF 거침) ✅ |
-| 입력 글리치 반응 | 없음 ✅ | 있음 (전파) | 없음 ✅ |
+| 출력 동기화 | 비동기 (조합) | 비동기 (즉각) | 동기 (FF 거침) ✅ |
+| 글리치 | 없음 ✅ | 있음 | 없음 ✅ |
 | 상태 수 | 많음 | 적음 | 적음 |
-| 상태도 표기 | 원 안에 출력 | 화살표에 입력/출력 | 화살표에 입력/출력 |
-| 변환 | — | — | Output-oriented assignment로 Moore→변환 가능 |
+| 변환 | — | — | Output-oriented로 Moore→변환 가능 |
 
 ### Sequential vs Parallel Multiplier
 | 구분 | Sequential | Parallel |
@@ -487,24 +486,18 @@ RS Latch → Gated Latch → Master-Slave FF → D Flip-flop
 - 신호등 FSM = Moore (출력이 상태만으로 고정, carew는 next state에만 영향)
 
 ### FSM Modeling & Synthesis (추가자료)
-**FSM 설계 5단계**
-1. 문제 이해 → 2. State Diagram 작성 → 3. State Minimization → 4. State Assignment → 5. 회로 구현(Boolean eq/K-map)
-- 가장 중요한 단계: State Diagram 정확히 도출
+**정리하기 ★**
+- FSM 설계에서 가장 중요한 단계: **State Diagram** 정확히 도출
+- FSM 구조: **Moore FSM**과 **Mealy FSM**으로 구분
+- Synchronous Mealy FSM: Mealy의 단점인 출력이 입력에 **asynchronous**하게 영향받는 것 방지
+- **Output-oriented State Assignment** 기법 적용 시 → Moore FSM을 Synchronous Mealy FSM으로 변환 가능
 
-**Moore vs Mealy vs Synchronous Mealy**
-- Moore: 출력=f(state), 비동기 조합 출력, 글리치 없음
-- Mealy: 출력=f(state,input), 입력에 즉각 반응(비동기), 글리치 가능
-- Synchronous Mealy: Mealy 출력 뒤에 FF 추가 → 동기화, 비동기 문제 해결
-- Output-oriented Assignment: 출력을 state bit로 재사용 → Moore를 Sync Mealy로 변환
-
-**State Minimization — Implication Chart Method**
-- 두 상태 합칠 조건: ①모든 입력에 출력 동일 ②next state 쌍도 합칠 수 있음
-- 표 작성 → 출력 다른 쌍 X → 조건 실패 연쇄 X → 남은 쌍 = 합칠 수 있는 쌍
-
-**State Assignment 방법 3가지**
-- Binary (Gray Code): ⌈log₂n⌉비트, Heuristic 규칙으로 인접 배정
-- One-Hot: n비트, 인코딩 쉬움, FPGA 적합, 대규모 FSM에 비실용적
-- Output-oriented: 출력 신호를 state bit로 재사용, Synchronous Mealy와 연결
+**문제 유형 ★**
+- 문제1: Moore FSM State Transition Diagram 작성
+  - 예: 매 클럭 1비트 입력, 마지막 3비트 패턴이 101 또는 010이면 OUT=1 (disjoint 3비트 단위)
+- 문제2: 같은 내용을 Mealy FSM으로 작성
+- 문제3: 주어진 Moore STD가 수행하는 동작 파악
+- 문제4: Implication Chart Method 적용 (State Minimization)
 
 ### Multipliers (추가자료)
 **곱셈 기본 원리**
