@@ -177,6 +177,72 @@ STWM   %r0,100(%r31)    ; 0→A[i], ptr+=100   (저장+포인터증가)
 ```
 → 루프 본체 **2개 명령어**. 컴파일러 최적화를 전제로 설계된 ISA.
 
+#### Ch1 응용문제 A: 컴파일러 구조 역할 식별
+
+**[문제]** 다음 각 작업이 컴파일러의 어떤 단계(Front-end/Middle-end/Back-end/Runtime)에서 수행되는지 답하라.
+
+| # | 작업 | 답 |
+|---|------|-----|
+| 1 | 입력 문자열을 토큰으로 분리 | Front-end (Lexer) |
+| 2 | 변수 사용 전 선언 여부 검사 | Front-end (Semantic Analysis) |
+| 3 | 파스 트리에서 AST/바이트코드 생성 | Middle-end (IR Generation) |
+| 4 | 공통 부분식 제거 (CSE) | Middle-end (Machine-indep. Opt) |
+| 5 | 레지스터 할당 | Back-end |
+| 6 | 명령어 스케줄링 | Back-end |
+| 7 | 여러 .o 파일을 합쳐 실행 파일 생성 | Runtime (Linker) |
+| 8 | LLVM IR → ARM 기계어 변환 | Back-end (Code Generator) |
+
+#### Ch1 응용문제 B: 실행 시간 개선 분석
+
+**[문제]** 프로그램의 IC=10^9, CPI=1.5, Clock=2GHz일 때:
+(a) 실행 시간을 구하라.
+(b) 컴파일러 최적화로 IC를 30% 줄이고 CPI를 1.2로 개선했다면 새 실행 시간과 속도 향상(speedup)을 구하라.
+
+**[풀이]**:
+```
+(a) 실행시간 = IC × CPI × CycleTime = 10^9 × 1.5 × (1/2×10^9)
+            = 10^9 × 1.5 × 0.5ns = 0.75초
+
+(b) 새 IC = 10^9 × 0.7 = 7×10^8
+    새 실행시간 = 7×10^8 × 1.2 × 0.5ns = 0.42초
+    Speedup = 0.75 / 0.42 = 1.79배
+```
+
+#### Ch1 응용문제 C: 스택머신코드 → RISC 코드 변환
+
+**[문제]** `z = x + y` (z: 전역 GP+8, x: 전역 GP+0, y: 지역 SP-4)의 스택머신코드를 RISC 의사코드로 변환하라. 현재 스택 깊이=0.
+
+**[풀이]**:
+```
+스택머신코드               RISC 변환 (스택깊이 추적)
+push_const GP+8     →    loadi GP+8, s0        ; z의 주소 (depth: 0→1)
+push_const GP+0     →    loadi GP+0, s1        ; x의 주소 (depth: 1→2)
+fetch               →    load  s1(0), s1       ; x의 값    (depth: 2→2)
+push_reg SP              copy  SP, s2           ; (depth: 2→3)
+push_const 4        →    loadi 4, s3            ; (depth: 3→4)
+sub                 →    sub   s2, s3, s2       ; SP-4      (depth: 4→3)
+fetch               →    load  s2(0), s2       ; y의 값    (depth: 3→3)
+add                 →    add   s1, s2, s1       ; x + y     (depth: 3→2)
+assign              →    store s0(0), s1        ; z = x+y   (depth: 2→0)
+```
+
+#### Ch1 응용문제 D: LLVM 구조의 장점
+
+**[문제]** LLVM에 새로운 프로그래밍 언어 Rust와 새로운 아키텍처 RISC-V를 추가하려 한다. 각각 어떤 부분만 구현하면 되는가? 기존에 지원하는 C/ARM과의 조합도 자동으로 지원되는가?
+
+**[풀이]**:
+```
+Rust 추가: Rust Frontend만 구현 (소스→LLVM IR 변환)
+  → 기존 LLVM Optimizer + 모든 Backend(X86,ARM,PPC...) 자동 활용
+  → Rust→X86, Rust→ARM, Rust→PPC 모두 자동 지원
+
+RISC-V 추가: RISC-V Backend만 구현 (LLVM IR→RISC-V 기계어)
+  → 기존 모든 Frontend(Clang,GHC...) + Optimizer 자동 활용
+  → C→RISC-V, Fortran→RISC-V, Haskell→RISC-V 모두 자동 지원
+
+M개 언어 + N개 아키텍처 = M+N개 모듈만 구현 (M×N이 아님!)
+```
+
 ---
 
 ### Ch2. 단계별 최적화 실전 예제
@@ -277,6 +343,174 @@ a = a+b             a2 = a1+b1           c1 = a3+b1
 
 φ-function = 표기법(실제 실행 안 됨). 경로에 따라 값 선택.
 이점: 변수 이름만으로 어느 정의인지 즉시 식별 → 분석/최적화 극적 단순화.
+
+#### Ch2 응용문제 A: 지역 최적화 적용
+
+**[문제]** 아래 BB에 가능한 모든 지역 최적화를 적용하고 결과 코드를 보여라.
+
+```
+a = load @x          ; (1)
+b = a + 1            ; (2)
+store b, @y           ; (3)
+c = load @y           ; (4)
+d = a + 1            ; (5)
+e = 3 * 4            ; (6)
+store e, @z           ; (7)
+f = load @z           ; (8)
+```
+
+**[풀이]**:
+```
+(1) a = load @x           ; 유지
+(2) b = a + 1             ; 유지
+(3) store b, @y            ; 유지
+(4) c = b                  ; Load-to-Copy: (3)에서 b를 @y에 저장 직후 load → copy
+(5) d = b                  ; Local CSE: a+1은 (2)에서 이미 계산, 결과=b → d=b
+                             (또는 copy propagation: d=a+1과 b=a+1이 동일)
+(6) e = 12                 ; Constant Folding: 3*4=12를 컴파일 타임에 계산
+(7) store 12, @z           ; Constant Propagation: e=12이므로 12 직접 사용
+(8) f = 12                 ; Load-to-Copy + Constant Propagation: @z에 12 저장 직후
+
+만약 c, d, f가 이후 사용되지 않으면 → Dead Code Elimination으로 삭제 가능
+```
+
+#### Ch2 응용문제 B: 최적화 단계 역추적
+
+**[문제]** 아래 변환 전/후 코드를 보고, 어떤 최적화 단계들이 적용되었는지 순서대로 나열하라.
+
+```
+변환 전 (루프 본체):          변환 후 (루프 본체):
+  LDW   SP-8, r10   ; i       ADD  r20, r11, r12
+  MULTI 16, r10, r11 ; i*16    STWS r0, 0(r12)
+  ADD   r20, r11, r12 ; &A+i*16  LDO 16(r11), r11
+  STWS  r0, 0(r12)   ; A[i]=0   IF r11 < r21 GOTO loop
+  LDW   SP-8, r10   ; i (중복)
+  LDO   1(r10), r13  ; i+1
+  STW   r13, SP-8    ; i=i+1
+  IF    r10 < r14 GOTO loop
+```
+
+**[풀이]**:
+```
+① Local CSE: 중복 LDW SP-8,r10 제거
+② Register Promotion: i를 스택(SP-8)에서 레지스터로 승격 → STW/LDW 제거
+③ Strength Reduction: MULTI 16,i → LDO 16(r11),r11 (곱셈→덧셈)
+④ Induction Variable Elimination: 원래 i 제거, r11 기반 조건으로 교체 (r11<r21)
+⑤ Dead Code Elimination: 원래 i 관련 코드 삭제
+```
+
+#### Ch2 응용문제 C: Register Promotion 적용 가능성 판단
+
+**[문제]** 아래 각 경우에 Register Promotion이 가능한지, 불가능하면 이유를 답하라.
+
+| # | 코드 | 가능? | 이유 |
+|---|------|-------|------|
+| 1 | `STW r5, SP-16; ... LDW SP-16, r8` | 가능 | singleton 지역변수 |
+| 2 | `STW r5, GP+100; ... LDW GP+100, r8` | 가능 | singleton 전역변수 |
+| 3 | `ADD r1,r2,r3; STW r5,0(r3); ... LDW 0(r3),r8` | 불가 | 포인터 기반 접근 — r3이 가리키는 곳이 가변 |
+| 4 | `STW r5, GP+arr+r2*4; ... LDW GP+arr+r2*4` | 불가 | 배열 접근 — 인덱스에 따라 다른 위치 |
+| 5 | `for 루프 내 STW/LDW SP-20` (구조체 필드) | 불가 | 구조체의 일부 — singleton 아님 |
+
+핵심: **singleton 변수** (단순 스칼라, 고정 주소)만 승격 가능. 배열, 포인터, 구조체 불가.
+
+#### Ch2 응용문제 D: Strength Reduction + IV Elimination 적용
+
+**[문제]** 아래 루프에 강도 감소와 유도 변수 제거를 적용하라.
+```c
+for (j = 0; j < 50; j++)
+    C[j*12] = D[j*6 + 3];
+```
+
+**[풀이]**:
+
+```
+유도변수: j (0→49)
+파생식: j*12 (0,12,24,...,588), j*6+3 (3,9,15,...,297)
+
+Step 1 — Strength Reduction:
+  t1 = 0;   // j*12 대체
+  t2 = 3;   // j*6+3 대체
+  for (j=0; j<50; j++) {
+      C[t1] = D[t2];
+      t1 += 12;        // 곱셈→덧셈
+      t2 += 6;         // 곱셈→덧셈
+  }
+
+Step 2 — IV Elimination (j를 t1 기반으로 조건 교체):
+  t1 = 0; t2 = 3;
+  while (t1 < 600) {   // j<50 → t1 < 50*12 = 600
+      C[t1] = D[t2];
+      t1 += 12;
+      t2 += 6;
+  }
+  → j 완전 제거. 곱셈 2개→덧셈 2개.
+```
+
+#### Ch2 응용문제 E: SSA 변환 + φ-function 삽입
+
+**[문제]** 아래 코드를 SSA로 변환하라.
+
+```
+    a = 1
+    b = 2
+    if (a < b)
+        a = a + b
+        b = a - 1
+    else
+        b = a * 3
+    c = a + b
+```
+
+**[풀이]**:
+
+```
+    a0 = 1
+    b0 = 2
+    if (a0 < b0)
+      then:
+        a1 = a0 + b0      ; a1 = 1+2 = 3
+        b1 = a1 - 1       ; b1 = 3-1 = 2
+      else:
+        b2 = a0 * 3       ; b2 = 1*3 = 3
+    합류점:
+        a2 = φ(a1, a0)    ; then→a1=3, else→a0=1
+        b3 = φ(b1, b2)    ; then→b1=2, else→b2=3
+    c0 = a2 + b3
+
+φ-function 삽입 기준:
+  - a: then에서 재정의(a1), else에서 미변경(a0) → φ 필요
+  - b: then에서 재정의(b1), else에서도 재정의(b2) → φ 필요
+  - c: 합류 후에만 정의 → φ 불필요
+```
+
+#### Ch2 응용문제 F: Copy Elimination 두 방법 비교
+
+**[문제]** 아래 코드에서 (a) copy propagation, (b) copy coalescing을 각각 적용한 결과를 보여라.
+
+```
+COPY r1, r2          ; r2 = r1
+ADD  r2, r3, r4      ; r4 = r2 + r3
+MUL  r2, r5, r6      ; r6 = r2 * r5
+```
+
+**[풀이]**:
+
+**(a) Copy Propagation**: r2 사용을 r1으로 교체
+```
+COPY r1, r2          ; (이제 dead → 삭제 가능)
+ADD  r1, r3, r4      ; r2 → r1
+MUL  r1, r5, r6      ; r2 → r1
+```
+r2가 더 이상 사용 안 됨 → COPY 삭제 (Dead Code Elim) → 결과:
+```
+ADD  r1, r3, r4
+MUL  r1, r5, r6
+```
+
+**(b) Copy Coalescing**: r1과 r2의 live range가 간섭하지 않으면 합쳐서 같은 물리 레지스터 할당
+- 조건: r1의 LR과 r2의 LR이 동시에 live인 구간이 없어야 함
+- r1이 COPY 이후에도 live하다면 (다른 곳에서 r1 사용) → **간섭 → coalescing 불가**
+- r1이 COPY 이후 dead라면 → 간섭 없음 → r1=r2로 통합 → COPY 삭제
 
 ---
 
