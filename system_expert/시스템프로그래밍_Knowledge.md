@@ -254,746 +254,1458 @@
 
 ## ④ 주제별 상세
 
+---
+
 ### Ch1. Introduction
 
 **핵심 개념**
-- Reality #1: Int ≠ Integer, Float ≠ Real → 유한 비트 → 오버플로우, 결합법칙 위반
-- Reality #2: 어셈블리 이해 필수 → 버그 분석, 컴파일러 최적화, 역공학
-- Reality #3: 메모리 유한 자원 → C는 메모리 보호 없음
-- Reality #4: 성능 ≠ 점근 복잡도 → 메모리 접근 패턴 결정적
-- Reality #5: I/O·네트워크도 시스템의 일부
 
-**예시 문제**
+Five Great Realities: 추상화 아래 숨겨진 현실을 이해해야 진짜 시스템 프로그래머다.
 
-Q. `copyij`와 `copyji`의 성능 차이(19배)를 지역성 관점에서 설명하라.
+| Reality | 내용 | 시험 포인트 |
+|---------|------|------------|
+| #1 | Int ≠ Integer, Float ≠ Real → 유한 비트 → 오버플로우, 결합법칙 위반 | `50000*50000` 오버플로우, `(1e20+-1e20)+3.14 ≠ 1e20+(-1e20+3.14)` |
+| #2 | 어셈블리 이해 필수 → 버그 분석, 최적화, 역공학 | 컴파일러 최적화 결과 해석 |
+| #3 | C는 메모리 보호 없음 → 배열 경계 초과도 OK | 버그 발생 위치 ≠ 오류 관측 위치 |
+| #4 | 성능 ≠ 점근 복잡도 → 메모리 접근 패턴이 결정적 | copyij(4.3ms) vs copyji(81.8ms) 19배 차이 |
+| #5 | I/O·네트워크도 시스템 | I/O 성능이 프로그램 신뢰성에 영향 |
+
+**★ 핵심 문제 1**: copyij vs copyji 성능 차이 설명
 
 ```
-A. C 2D 배열은 Row-Major Order로 저장됨.
-   copyij: a[i][j] 접근 → 연속 메모리 순차 접근 → 공간적 지역성 ↑ → Cache Hit 多
-   copyji: a[i][j] 접근 시 i가 내부 루프 → N칸씩 건너뜀 → Cache Miss 多
-   → Cache Miss마다 DRAM 접근(~100 cycles) vs Cache Hit(~4 cycles) → 약 25배 비용 차이
+Q. void copyij(int src[2048][2048], int dst[2048][2048])에서
+   i가 외부 루프일 때와 j가 외부 루프일 때 성능이 19배 차이 나는 이유는?
+
+A. C 2D 배열은 Row-Major Order 저장:
+   메모리: src[0][0], src[0][1], ..., src[0][2047], src[1][0], ...
+                                                    ↑ 4×2048 = 8192 bytes 간격
+
+   i 외부(copyij): src[i][j], src[i][j+1] → 연속 주소 → 공간적 지역성 ↑
+     → 64-byte Cache Line에 16개 int 포함 → 16번에 1번 Miss
+     → Cache Hit Rate 매우 높음 → 빠름
+
+   j 외부(copyji): src[i][j], src[i+1][j] → 8192 bytes 건너뜀
+     → 매번 새 Cache Line → 거의 매번 Miss
+     → Miss 시 DRAM 접근(~100 cycles) → Cache Hit(~4 cycles)의 25배 비용
+     → 느림
 ```
 
 ---
 
 ### Ch2-1. Machine Basics
 
-**메모리 주소 지정 일반형**
+**핵심 개념**
+
+ISA vs Microarchitecture: 프로그래머는 ISA(레지스터, 명령어)만 보면 된다. 파이프라인, 캐시, TLB는 보이지 않는다.
+
+**AT&T 문법**: `op Src, Dest` (Intel과 반대 — 항상 헷갈리는 부분)
+
+Operand 3종과 핵심 제약:
+```
+Immediate: $0x400, $-533        (값 자체)
+Register:  %rax, %r13           (레지스터 값)
+Memory:    (%rax), 8(%rcx)      (메모리에서 로드)
+★ Memory → Memory 직접 이동 불가! 반드시 레지스터 경유
+```
+
+**메모리 주소 지정 일반형**:
+```
+D(Rb, Ri, S) = Mem[Reg[Rb] + S×Reg[Ri] + D]
+  S ∈ {1, 2, 4, 8}    ← 이 4가지만!
+  Ri ≠ %rsp           ← %rsp는 인덱스 레지스터 불가
+```
+
+**leaq vs movq — 핵심 구분**:
+```
+leaq Src, Dst: 주소값을 Dst에 저장  (메모리 접근 없음)
+movq Src, Dst: 메모리 값을 Dst에 저장 (메모리 접근 있음)
+
+leaq 8(%rdi), %rax  →  %rax = %rdi + 8      ← 주소
+movq 8(%rdi), %rax  →  %rax = Mem[%rdi+8]   ← 메모리의 값
+
+leaq 응용: b*3 최적화
+  leaq (%rdi,%rdi,2), %rax  →  %rax = %rdi + 2×%rdi = 3×%rdi
+```
+
+**★ 핵심 문제 1**: 주소 계산
 
 ```
-D(Rb, Ri, S) = Mem[Reg[Rb] + S × Reg[Ri] + D]
+Q. %rdx=0xf000, %rcx=0x0100 일 때 다음 각 표현식의 주소 값은?
 
-  Rb  : Base register (16개 모두 가능)
-  Ri  : Index register (%rsp 사용 불가)
-  S   : Scale (1, 2, 4, 8 중 하나)
-  D   : Displacement (상수, 1/2/4 bytes)
-```
+(a) 0x8(%rdx)       (b) (%rdx,%rcx)
+(c) (%rdx,%rcx,4)   (d) 0x80(,%rdx,2)
 
-**예시 문제**
-
-Q. `%rdx = 0xf000`, `%rcx = 0x0100` 일 때 `0x80(%rdx,%rcx,4)` 의 주소는?
-
-```
 풀이:
-  Mem[ Reg[%rdx] + 4 × Reg[%rcx] + 0x80 ]
-= Mem[ 0xf000 + 4 × 0x0100 + 0x80 ]
-= Mem[ 0xf000 + 0x400 + 0x80 ]
-= Mem[ 0xf480 ]
+(a) Mem[0xf000 + 8]            = Mem[0xf008]
+(b) Mem[0xf000 + 0x100]        = Mem[0xf100]
+(c) Mem[0xf000 + 4×0x100]     = Mem[0xf400]
+(d) Mem[2×0xf000 + 0x80]      = Mem[0x1e080]
 ```
 
-**leaq vs movq 비교**
+**★ 핵심 문제 2**: leaq를 이용한 산술 표현
 
 ```
-leaq 8(%rdi), %rax   → %rax = %rdi + 8    (주소값 저장, 메모리 접근 없음)
-movq 8(%rdi), %rax   → %rax = Mem[%rdi+8] (메모리에서 값 로드)
+Q. 다음 C 코드를 컴파일하면 어떤 어셈블리가 나오는가?
+   long scale(long x, long y, long z) {
+       return 5*x + 2*y + 8*z;
+   }
+   인자: %rdi=x, %rsi=y, %rdx=z
+
+풀이 (leaq 활용):
+   leaq (%rdi,%rdi,4), %rax   # %rax = x + 4x = 5x
+   leaq (%rsi,%rsi), %rcx     # %rcx = y + y = 2y  (or addq %rsi,%rsi)
+   leaq (,%rdx,8), %rdx       # %rdx = 8z
+   addq %rcx, %rax            # %rax = 5x + 2y
+   addq %rdx, %rax            # %rax = 5x + 2y + 8z
+   ret
 ```
 
 ---
 
 ### Ch2-2. Machine Control
 
-**Condition Code 설정 및 활용**
+**핵심 개념**
+
+Condition Codes (4개의 1-bit 플래그):
+```
+CF: unsigned 오버플로우 (Carry/Borrow 발생)
+ZF: 결과 = 0
+SF: 결과 < 0 (최상위 비트 = 1)
+OF: signed 오버플로우 (부호 바뀜)
+
+설정 방법:
+  암묵적: addq, subq, imulq 등 산술연산 (단, leaq는 설정 안함!)
+  cmpq b, a: a-b 계산 (저장 안함) → ★ 순서 주의: cmpq Src2, Src1 → Src1-Src2
+  testq b, a: a&b 계산 (저장 안함) → 주로 testq %rax,%rax (0 확인)
+```
+
+모든 루프는 결국 **goto + 조건 점프**로 변환된다:
+```
+while: Jump-to-Middle    →  goto test; loop: body; test: if(c) goto loop;
+do-while:                →  loop: body; if(c) goto loop;
+for:                     →  init; goto test; loop: body; update; test: if(c) goto loop;
+```
+
+**★ 핵심 문제 1**: Condition Code 추론
 
 ```
-cmpq %rsi, %rdi   →  %rdi - %rsi 계산 (저장 안함)
-  ZF=1 if %rdi == %rsi
-  SF=1 if %rdi - %rsi < 0
-  CF=1 if unsigned borrow 발생
-  OF=1 if signed overflow 발생
+Q. 다음 어셈블리 실행 후 각 CC의 값은? (a = 0x8000000000000000, b = 0x8000000000000000)
+   addq %rsi, %rdi   # %rdi = a + b (signed 관점에서는 음수 + 음수 = 양수?)
 
-testq %rax, %rax  →  %rax & %rax (저장 안함)
-  ZF=1 if %rax == 0
-  SF=1 if %rax < 0   (부호 비트 확인)
+풀이:
+   a + b = 0x8000000000000000 + 0x8000000000000000 = 0x10000000000000000
+   64-bit로 자르면: 0x0000000000000000
+
+   CF = 1 (최상위 비트에서 carry 발생 → unsigned overflow)
+   ZF = 1 (결과 = 0)
+   SF = 0 (결과의 최상위 비트 = 0)
+   OF = 1 (음수 + 음수 = 양수 → signed overflow)
 ```
 
-**루프 변환 예시**
+**★ 핵심 문제 2**: 어셈블리 → C 복원
 
-```c
-// 원본 while
-while (x > 0) { x--; }
+```
+Q. 다음 어셈블리를 C 코드로 복원하라.
+   # %rdi = x, %rsi = y, 반환값 = %rax
+   absdiff:
+     cmpq %rsi, %rdi
+     jle  .L4
+     movq %rdi, %rax
+     subq %rsi, %rax
+     ret
+   .L4:
+     movq %rsi, %rax
+     subq %rdi, %rax
+     ret
 
-// Jump-to-Middle 변환 (-Og)
-    goto test;
-loop:
-    x--;
-test:
-    if (x > 0) goto loop;
+풀이:
+   cmpq %rsi, %rdi  →  %rdi - %rsi 비교  →  if (x <= y) goto .L4
+   then: %rax = %rdi - %rsi = x - y
+   else: %rax = %rsi - %rdi = y - x
+
+   long absdiff(long x, long y) {
+       if (x > y) return x - y;
+       else       return y - x;
+   }
 ```
 
 ---
 
-### Ch2-3. Procedures (스택 프레임)
+### Ch2-3. Procedures
 
-**스택 프레임 레이아웃**
+**핵심 개념**
 
 ```
+스택 성장 방향: 높은 주소 → 낮은 주소
+pushq reg: %rsp -= 8, Mem[%rsp] = reg
+popq  reg: reg = Mem[%rsp], %rsp += 8
+
+call label: push 복귀주소(%rip_next), jmp label
+ret:        pop %tmp, jmp *%tmp
+```
+
+인자 전달 순서 (**반드시 암기**):
+```
+1번째: %rdi   2번째: %rsi   3번째: %rdx
+4번째: %rcx   5번째: %r8    6번째: %r9
+7번째~: 스택 (역순 push)
+반환값: %rax
+```
+
+레지스터 저장 규칙:
+```
+Caller-saved: %rax, %rcx, %rdx, %rsi, %rdi, %r8~%r11
+  → Callee가 자유롭게 덮어씀. Caller가 필요하면 call 전에 저장
+
+Callee-saved: %rbx, %r12, %r13, %r14, %rbp
+  → Callee가 사용 전 push, 반환 전 pop 필수
+
+★ 핵심: Callee-saved를 쓰는 이유
+   = Caller가 call 이후에도 해당 레지스터 값이 필요할 때
+```
+
+스택 프레임 레이아웃:
+```
 높은 주소
-┌─────────────────────┐
-│   caller의 인자 7~  │  (7개 이상 인자 시)
-├─────────────────────┤
-│   반환 주소          │  ← call 명령어가 push
-├─────────────────────┤  ← 새 %rbp (선택적)
-│   saved callee regs │  ← callee-saved 레지스터 백업
-├─────────────────────┤
-│   지역 변수          │
-├─────────────────────┤
-│   인자 빌드 공간     │  (다음 함수 호출용 7번째~ 인자)
-└─────────────────────┘  ← %rsp
+┌──────────────────────┐
+│  Caller 인자 7+       │ (7개 이상일 때)
+├──────────────────────┤
+│  반환 주소 (8 bytes)  │ ← call 명령어가 push
+├──────────────────────┤ ← (선택) %rbp
+│  Callee-saved 레지스터│ ← push %rbx 등
+├──────────────────────┤
+│  지역 변수            │
+├──────────────────────┤
+│  인자 빌드 공간       │ (다음 호출용)
+└──────────────────────┘ ← %rsp
 낮은 주소
 ```
 
-**예시 문제**
-
-Q. 아래 코드에서 `pcount` 재귀 호출 시 `%rbx`를 저장하는 이유는?
-
-```c
-long pcount(unsigned long x) {
-    if (x == 0) return 0;
-    return (x & 1) + pcount(x >> 1);
-}
-```
+**★ 핵심 문제 1**: 스택 프레임 추적
 
 ```
-A. %rbx는 Callee-saved 레지스터.
-   pcount는 x & 1 값을 재귀 호출 이후에도 사용해야 함.
-   재귀 호출(call pcount) 시 %rbx가 덮어씌워질 수 있으므로
-   진입 시 push %rbx로 저장, 반환 전 pop %rbx로 복원.
+Q. 다음 코드에서 함수 진입 직후 스택 상태를 그려라.
+   long sum(long a, long b) { return a + b; }
+   main에서: long r = sum(3, 7);
+
+풀이:
+  caller (main):
+    movq $3, %rdi        # a = 3 (1번째 인자)
+    movq $7, %rsi        # b = 7 (2번째 인자)
+    call sum             # push 복귀주소, jmp sum
+
+  sum 진입 직후 스택:
+  높은 주소
+  ┌────────────────────┐
+  │ 복귀주소 (8 bytes)  │ ← %rsp
+  └────────────────────┘
+  낮은 주소
+
+  sum 실행:
+    %rax = %rdi + %rsi = 3 + 7 = 10
+    ret  # pop 복귀주소 → %rip, %rsp += 8
+```
+
+**★ 핵심 문제 2**: Callee-saved 필요성
+
+```
+Q. 왜 pcount 재귀 함수에서 %rbx를 사용해 x & 1을 저장하는가?
+   long pcount(unsigned long x) {
+       if (x == 0) return 0;
+       return (x & 1) + pcount(x >> 1);
+   }
+
+풀이:
+  pcount는 x & 1 값을 재귀 호출 이후에도 사용해야 함.
+  재귀 call 시 %rdi(%rax 등)는 Caller-saved → 덮어써짐.
+  따라서 x & 1을 Callee-saved인 %rbx에 저장:
+    pushq %rbx          # %rbx 보존
+    movq  %rdi, %rbx   # x를 %rbx에 백업
+    ...
+    call  pcount        # %rbx는 보존됨 (callee-saved)
+    andl  $1, %ebx     # x & 1 복원
+    addq  %rbx, %rax   # (x&1) + 재귀 결과
+    popq  %rbx          # %rbx 복원
+    ret
 ```
 
 ---
 
 ### Ch3. Stack Buffer Overflow
 
-**스택 취약점 구조**
+**핵심 개념**
 
+C는 배열 경계를 검사하지 않는다. gets(), strcpy() 등 길이 무제한 함수로 스택 버퍼를 초과하면 반환 주소까지 덮어쓸 수 있다.
+
+**취약점 구조**:
 ```
-함수 내 char name[32] 선언 시:
+char name[32]이 rbp-0x20에 위치할 때:
 
 높은 주소
-┌──────────────────┐
-│   RET ADDR       │  ← name 기준 +40 bytes
-├──────────────────┤
-│   saved %rbp     │  ← name 기준 +32 bytes
-├──────────────────┤ ← %rbp
-│   name[0..31]    │  ← %rbp - 0x20
-└──────────────────┘ ← %rsp
+┌───────────────────┐
+│  반환 주소         │ ← name + 40 (name[40]~name[47])
+├───────────────────┤
+│  saved %rbp       │ ← name + 32 (name[32]~name[39])
+├───────────────────┤ ← %rbp
+│  name[0..31]      │ ← %rbp - 0x20
+└───────────────────┘ ← %rsp
 낮은 주소
 
-name에 40바이트 이상 쓰면 RET ADDR 덮어씀
-→ ret 실행 시 공격자가 원하는 주소로 점프
+★ 41번째 바이트(name[40])부터 반환 주소 덮어씀
+  → ret 실행 시 공격자가 원하는 주소로 점프
 ```
 
-**공격-방어 흐름**
-
+공격-방어 체계:
 ```
-Code Injection
-  → NX Bit (스택 non-executable) 로 방어
-  → ROP 로 우회 (기존 실행 가능 코드의 Gadget 체인)
-  → ASLR 로 방어 (Gadget 주소 예측 불가)
-  → Stack Canary 로 추가 방어 (오버플로우 탐지)
+Code Injection → NX Bit로 방어 (스택 non-executable)
+NX 우회       → ROP (기존 코드 Gadget 조합, 0xc3=ret으로 끝나는 시퀀스)
+ROP           → ASLR로 주소 예측 어렵게
+오버플로우 탐지→ Stack Canary (%fs:0x28 랜덤값, 반환 전 검사)
 ```
 
-**예시 문제**
-
-Q. `name[32]` 버퍼가 `rbp-0x20`에 위치할 때, RET ADDR을 덮어쓰려면 몇 바이트를 입력해야 하는가?
+**★ 핵심 문제 1**: 오버플로우 offset 계산
 
 ```
+Q. char buf[32]가 rbp-0x20에 위치한다. 반환 주소를 덮어쓰려면
+   gets(buf)에 최소 몇 바이트를 입력해야 하는가?
+   (주어진 정보: saved rbp = 8 bytes, 반환 주소 = 8 bytes)
+
 풀이:
-  name[] 시작 → saved %rbp: 32 bytes
-  saved %rbp (8 bytes)
-  RET ADDR 시작: 32 + 8 = 40 bytes 위치
-  → RET ADDR을 덮어쓰려면 최소 41번째 바이트부터 4/8바이트 제어 필요
-  답: 40바이트(패딩) + 8바이트(원하는 주소) = 48바이트 입력
+  buf 시작: rbp - 0x20 = rbp - 32
+  saved rbp: rbp + 0  (= buf + 32)
+  반환 주소: rbp + 8  (= buf + 40)
+
+  반환 주소를 덮어쓰려면 buf[40]~buf[47]에 쓰기 필요
+  → 최소 41 bytes 필요 (buf[0]~buf[39]: 패딩 40 bytes, buf[40]~: 반환주소)
+
+  정확히 덮어쓰려면: 40 bytes 패딩 + 8 bytes 주소 = 48 bytes 입력
+```
+
+**★ 핵심 문제 2**: ROP chain 이해
+
+```
+Q. NX bit가 켜져 있을 때 공격자는 어떻게 임의 코드를 실행하는가?
+
+A. Return-Oriented Programming (ROP):
+   기존 .text 섹션의 코드를 활용 → NX와 무관
+
+   Gadget: ret(0xc3)으로 끝나는 기존 명령어 시퀀스
+   예:
+     0x4005a1: pop %rdi ; ret   ← Gadget 1
+     0x4005b3: pop %rsi ; ret   ← Gadget 2
+
+   스택에 Gadget 주소 체인 배치:
+   ┌──────────────────┐
+   │ Gadget1 주소     │ ← 반환 주소로 덮어씀
+   │ 인자값 (0x1234)  │ ← pop %rdi가 가져갈 값
+   │ Gadget2 주소     │ ← Gadget1의 ret가 여기로 점프
+   │ 인자값 (0x5678)  │
+   │ syscall 주소     │
+   └──────────────────┘
+
+   실행 흐름: ret → Gadget1 → ret → Gadget2 → ret → syscall
+   → 체인처럼 연결하여 임의 동작 수행
+   → .text에 있는 코드이므로 NX bit 우회 가능!
+```
+
+**★ 핵심 문제 3**: Stack Canary 동작
+
+```
+Q. Stack Canary가 buf[32] 위에 배치될 때, 공격자가 반환 주소를 덮어쓰면
+   어떤 일이 일어나는가?
+
+A. 스택 레이아웃 (canary 포함):
+   ┌──────────────────┐
+   │  반환 주소        │
+   ├──────────────────┤
+   │  saved %rbp      │
+   ├──────────────────┤
+   │  CANARY (8 bytes)│ ← %fs:0x28의 값
+   ├──────────────────┤
+   │  buf[0..31]      │
+   └──────────────────┘
+
+   반환 주소까지 덮어쓰려면 반드시 canary도 덮어씀
+   함수 반환 전: mov -0x8(%rbp), %rax; xor %fs:0x28, %rax
+   → canary가 변조됐으면 ZF=0 → jne __stack_chk_fail
+   → 프로그램 즉시 종료 (abort)
+
+   결론: Canary 덮어쓰지 않고 반환 주소만 바꾸는 것은 불가능
+   (일부 취약점: 특정 바이트만 덮어쓰는 형식 스트링 공격 등)
 ```
 
 ---
 
 ### Ch4. Memory Hierarchy
 
-**캐시 계층 구조**
+**핵심 개념**
 
+CPU-Memory Gap: CPU는 빠르고 DRAM은 느리다(약 100배). 이 격차를 지역성으로 해결한다.
+
+지역성 원칙:
 ```
-접근 시간   용량      위치
-~0 cycles   수십 B    ┌─────────────────────┐
-                      │  CPU Registers (L0)  │
-~4 cycles   32 KB     ├─────────────────────┤
-                      │  L1 Cache (SRAM)     │
-~10 cycles  256 KB    ├─────────────────────┤
-                      │  L2 Cache (SRAM)     │
-~수십 cycles 8 MB     ├─────────────────────┤
-                      │  L3 Cache (SRAM)     │
-~100 cycles 수십 GB   ├─────────────────────┤
-                      │  DRAM (Main Memory)  │
-~10^7 cycles 수 TB    ├─────────────────────┤
-                      │  SSD / HDD (Disk)    │
-                      └─────────────────────┘
+시간적 지역성: 최근 접근한 데이터는 곧 다시 접근
+공간적 지역성: 최근 접근한 위치 근처를 곧 접근
+
+캐시가 동작하는 이유: 프로그램이 이 패턴을 따르기 때문
 ```
 
-**예시 문제**
-
-Q. 아래 두 함수 중 캐시 효율이 좋은 것은? 이유를 설명하라.
-
-```c
-// A: sum_rows
-for(i=0; i<M; i++)
-  for(j=0; j<N; j++) sum += a[i][j];
-
-// B: sum_cols
-for(j=0; j<N; j++)
-  for(i=0; i<M; i++) sum += a[i][j];
+캐시 동작:
+```
+Cache Line = 64 bytes (블록 전송 단위)
+Hit:  요청 블록이 캐시에 있음 → 빠름 (~4 cycles)
+Miss: 요청 블록이 없음 → 다음 레벨 메모리에서 로드 (~100 cycles for DRAM)
+      Placement Policy: 어디에 배치할지
+      Replacement Policy: 무엇을 교체할지 (LRU, FIFO, Random)
 ```
 
+**★ 핵심 문제 1**: 지역성 분석
+
 ```
-A가 캐시 효율 좋음.
-C 2D 배열은 Row-Major Order:
-  a[0][0], a[0][1], ..., a[0][N-1], a[1][0], ...
-A: a[i][j] → a[i][j+1] → 연속 메모리 → 공간적 지역성 ↑
-B: a[0][j] → a[1][j] → N*4 bytes 건너뜀 → Cache Miss 빈번
+Q. 다음 두 함수 중 어떤 것이 더 좋은 캐시 성능을 갖는가? 이유를 설명하라.
+
+// 함수 A:
+for (i = 0; i < M; i++)
+    for (j = 0; j < N; j++)
+        sum += a[i][j];
+
+// 함수 B:
+for (j = 0; j < N; j++)
+    for (i = 0; i < M; i++)
+        sum += a[i][j];
+
+A. 함수 A가 더 좋은 캐시 성능을 가진다.
+
+근거:
+  C 2D 배열: Row-Major Order → a[i][0], a[i][1], ..., a[i][N-1], a[i+1][0], ...
+
+  함수 A(행 우선): a[i][0]→a[i][1]→...  연속 주소 → 공간적 지역성 ↑
+    Cache Line 64 bytes = int 16개 → 16번에 1번 Miss
+
+  함수 B(열 우선): a[0][j]→a[1][j]→...  N×4 bytes 건너뜀
+    N=2048이면 8192 bytes 건너뜀 → 매번 새 Cache Line → 거의 매번 Miss
+
+  성능 차이: 최대 16배 이상 (Cache Miss 비율 차이)
+```
+
+**★ 핵심 문제 2**: Cache Miss 유형 분류
+
+```
+Q. 3C 모델로 캐시 미스를 분류하라.
+
+A. 3C (Three C's of Cache Misses):
+
+1. Compulsory Miss (Cold Miss):
+   = 처음 접근하는 블록 → 반드시 발생, 피할 수 없음
+   → Prefetching으로 완화 가능
+
+2. Capacity Miss:
+   = Working Set > Cache 크기 → 데이터가 캐시에 들어가지 않음
+   → 더 큰 캐시 필요, 또는 Working Set 줄이기
+
+3. Conflict Miss:
+   = Set-associative 캐시에서 동일 Set에 너무 많은 블록이 매핑
+   → Associativity 높이기, 접근 패턴 변경
+
+예: Direct-mapped cache (size=32KB, line=64B, sets=512)
+   stride=512*64=32KB인 접근 → 모두 Set 0으로 매핑 → Conflict Miss 폭발
 ```
 
 ---
 
 ### Ch5. Code Optimization & Linking
 
-**컴파일러 최적화 기법 요약**
+**핵심 개념**
+
+컴파일러 최적화 원칙: 프로그램 동작이 바뀌지 않는 범위에서만 최적화
+
+컴파일러가 **할 수 없는** 최적화:
+```
+1. Side effect 있는 함수를 루프 밖으로 이동 불가
+   → strlen(s)는 s를 수정할 수 있으므로 Code Motion 불가
+
+2. Signed integer overflow = Undefined Behavior 이용한 최적화
+   → 컴파일러가 "항상 true"인 조건을 제거할 수 있음
+
+3. 함수 단위 분석 → aliasing 제거 불가
+   → *p와 *q가 같은 주소를 가리킬 수 있으면 재정렬 불가
+```
+
+링킹 3단계:
+```
+1. 심볼 테이블 구성 (어셈블러):
+   Global: non-static 함수/전역 → 다른 파일에서 참조 가능
+   Local:  static 함수/변수    → 파일 내부에서만
+   External Ref: 다른 파일의 심볼 참조
+
+2. 심볼 해석 (링커): External Ref → 정의에 연결
+
+3. 재배치 (링커): .o의 임시주소(0x0) → 최종 절대주소
+   (objdump -r -d로 재배치 엔트리 확인)
+```
+
+**★ 핵심 문제 1**: 최적화 한계 분석
 
 ```
-Constant Folding:  0xFF << 8           → 0xFF00          (컴파일 시간 계산)
-Strength Reduction: b * 5             → (b<<2) + b       (곱셈→시프트)
-Code Motion:       루프 내 n*i        → 루프 밖으로 이동  (루프 불변)
-CSE:              v[i].x * v[i].x     → t=v[i].x; t*t   (중복 계산 제거)
-Inlining:         pred(y) 호출        → 본문 직접 삽입   (함수 오버헤드 제거)
-Loop Unrolling:   i++ 4번 반복        → i+=4 한 번       (분기 감소)
+Q. 다음 코드에서 컴파일러가 lower1을 lower2로 최적화할 수 없는 이유는?
+
+void lower1(char *s) {
+    for (int i = 0; i < strlen(s); i++)
+        if (s[i] >= 'A' && s[i] <= 'Z') s[i] -= 32;
+}
+
+void lower2(char *s) {
+    int n = strlen(s);  // 루프 밖으로 이동
+    for (int i = 0; i < n; i++)
+        if (s[i] >= 'A' && s[i] <= 'Z') s[i] -= 32;
+}
+
+A. 컴파일러는 s[i] -= 32가 s 문자열 자체를 수정함을 인식.
+   strlen(s)는 s를 읽으므로, s가 변경되면 strlen 결과도 달라질 수 있음.
+   → 컴파일러는 side effect 가능성 때문에 안전하게 매 반복 strlen 호출 유지
+   → lower1: O(n²), lower2: O(n) (프로그래머가 직접 최적화해야 함)
 ```
 
-**링킹 3단계**
+**★ 핵심 문제 2**: 링킹 순서와 심볼 해석
 
 ```
-Step 1: 심볼 테이블 구성 (어셈블러)
-  Global: non-static 함수/전역변수 → 다른 파일에서 참조 가능
-  Local:  static 함수/변수         → 같은 파일 내에서만
-  External Reference: 다른 파일에서 정의된 심볼 참조
+Q. main.c가 sum()을 호출하고 sum.c에 정의된 경우:
+   (1) 컴파일 단계에서 sum은 어떻게 처리되는가?
+   (2) 링킹 후 실행 파일에서 call sum은 어떻게 변하는가?
 
-Step 2: 심볼 해석 (링커)
-  각 External Reference → 해당 정의(Definition)에 연결
+A.
+(1) 컴파일 단계 (main.o):
+    call 0x0000 ; R_X86_64_PC32 sum  ← 임시 주소 + 재배치 엔트리
+    "sum은 external reference이므로 주소를 나중에 채울 것"
 
-Step 3: 재배치 (링커)
-  .o 파일의 임시 주소(0x0) → 최종 실행파일의 절대 주소로 교체
-  (objdump -r -d로 재배치 엔트리 확인 가능)
+(2) 링킹 후:
+    sum()이 0x4004e8에 배치됐다면:
+    call 0x4004e8  ← 실제 절대 주소로 패치됨
+    (PC-relative addressing: 호출 지점 0x4004de에서 +0xa = 0x4004e8)
 ```
 
 ---
 
 ### Ch6. Virtual Memory
 
-**가상 주소 → 물리 주소 변환 흐름**
+**핵심 개념**
 
+VM의 3역할:
 ```
-CPU가 VA 생성
-     │
-     ▼
-┌──────────────────────────────────────┐
-│  VA = VPN[1] | VPN[2] | VPN[3] | VPN[4] | VPO  │
-│       9bit     9bit     9bit    9bit     12bit   │
-└──────────────────────────────────────┘
-     │
-     ▼ TLB 조회 (VPN → PPN 캐시)
-   Hit ──────────────────────────┐
-   Miss                          │
-     │                           │
-     ▼                           │
-  L1 PT (CR3 → 물리주소)         │
-     │ → L2 PT → L3 PT → L4 PT  │
-     │            PPN 획득       │
-     └────────────────────────── ┤
-                                 ▼
-                       PA = PPN | VPO
-                                 │
-                                 ▼
-                       L1 Cache 조회
-                       (Hit → 데이터 반환)
-                       (Miss → DRAM 접근)
+1. Caching: DRAM이 디스크의 캐시 역할
+   → 모든 데이터는 원래 디스크에 있음
+   → 자주 접근하는 4KB 페이지를 DRAM에 캐시
+
+2. Memory Management: 프로세스마다 독립적인 선형 주소 공간
+   → fork() 시 COW로 효율적 복제
+
+3. Memory Protection: PTE 권한 비트(R/W, U/S, XD)로 접근 제어
+   → 매 메모리 접근 시 MMU가 검사
 ```
 
-**Page Fault 처리 7단계**
+주소 변환:
+```
+VA(48-bit) = VPN(36-bit) | VPO(12-bit)
+PA         = PPN(40-bit) | PPO(12-bit)  (PPO = VPO)
+
+4단계 PT (Core i7):
+  VA = VPN1(9) | VPN2(9) | VPN3(9) | VPN4(9) | VPO(12)
+  CR3 → L1 PT → L2 PT → L3 PT → L4 PT → PPN
+  L1 PTE가 null이면 → 512GB 영역 전체 unmapped
+  → 미사용 영역에 PT 메모리 낭비 없음 (Multi-level의 장점)
+```
+
+**★ 핵심 문제 1**: 단일 PT 크기 계산
 
 ```
-① CPU가 VA 접근 → MMU가 PTE 조회
-② PTE의 valid bit = 0 → Page Fault 예외 발생
-③ 커널의 Page Fault Handler 실행
-④ Victim 페이지 선택 (LRU 등 교체 정책)
-⑤ Victim dirty 시 디스크에 write-back
-⑥ 필요한 페이지를 디스크에서 물리 메모리로 로드
-⑦ PTE 갱신 (valid=1, PPN 설정) → iret → 원래 명령어 재실행
-```
+Q. 48-bit VA, 4KB 페이지, 8-byte PTE인 시스템에서 단일 PT의 크기는?
 
-**예시 문제**
-
-Q. 48-bit 가상 주소 공간, 4KB 페이지, 8-byte PTE인 시스템에서 단일 페이지 테이블의 크기는?
-
-```
 풀이:
+  페이지 크기 = 2^12 bytes
   가상 페이지 수 = 2^48 / 2^12 = 2^36
-  단일 PT 크기  = 2^36 × 8 bytes = 2^39 bytes = 512 GB
-  → 비현실적 → Multi-Level PT 필요
-  Core i7: 4단계 (VPN = 9+9+9+9 bits)
+  단일 PT 크기 = 2^36 × 8 bytes = 2^39 bytes = 512 GB
+
+  → 비현실적! → 4단계 PT로 해결
+  4단계 PT: VA = 9+9+9+9+12 bits
+  L1 PT 크기 = 2^9 × 8 bytes = 4 KB (단 하나의 페이지만 필요)
+```
+
+**★ 핵심 문제 2**: Page Fault 처리 7단계
+
+```
+Q. 프로세스가 가상 주소 A에 접근했을 때 Page Fault가 발생하면 어떤 일이 일어나는가?
+
+A. Page Fault 처리 7단계:
+①  CPU가 VA 생성 → MMU가 페이지 테이블에서 PTE 조회
+②  PTE의 valid bit(P) = 0 → Page Fault 예외 발생 (Fault 타입)
+③  커널의 Page Fault Handler로 제어 전달
+④  Handler가 교체할 Victim 페이지 선택 (LRU 등)
+⑤  Victim의 D(Dirty) bit = 1이면 → 디스크에 먼저 write-back
+⑥  필요한 페이지를 디스크에서 물리 메모리로 로드
+⑦  PTE 갱신 (P=1, PPN 설정) → iret → 원래 명령어 재실행 (이번엔 Hit)
+
+★ Fault 타입이므로 I_current(원인 명령어)를 재실행!
+   (Interrupt/Trap의 I_next와 다름)
+```
+
+**★ 핵심 문제 3**: TLB Hit vs Miss 비교
+
+```
+Q. VA→PA 변환 시 TLB Hit과 TLB Miss의 메모리 접근 횟수를 비교하라.
+
+A.
+TLB Hit:
+  ① CPU → MMU: VA 전송
+  ② MMU: TLB에서 VPN→PPN 변환 (캐시 히트, DRAM 접근 없음)
+  ③ MMU → Cache/Memory: PA로 데이터 요청
+  ④ 데이터 반환
+  → DRAM 접근: 1회 (데이터만)
+
+TLB Miss:
+  ① CPU → MMU: VA 전송
+  ② MMU: TLB miss → 페이지 테이블에서 PTE 조회 (DRAM 접근 1회)
+     4단계 PT라면 최대 4회 DRAM 접근
+  ③ TLB 갱신 후 PA 생성
+  ④ MMU → Cache/Memory: PA로 데이터 요청 (DRAM 접근 1회)
+  → DRAM 접근: 2~5회
+
+TLB Miss가 드문 이유: 시간적 지역성 (최근 변환한 페이지를 곧 다시 접근)
+```
+
+**★ 핵심 문제 4**: COW (Copy-on-Write) 동작
+
+```
+Q. fork() 직후 자식이 지역 변수 x를 수정하면 어떤 일이 일어나는가?
+
+A. fork() 시:
+  ① 부모의 페이지 테이블을 자식에게 복사
+  ② 두 프로세스의 모든 페이지를 Read-Only로 표시 (COW 설정)
+  ③ 물리 페이지는 공유 (아직 복사 안 함)
+
+  자식이 x를 쓰려 하면:
+  ④ Read-Only 페이지에 쓰기 → Protection Fault 발생
+  ⑤ 커널 핸들러: 해당 물리 페이지를 새 물리 페이지에 복사
+  ⑥ 자식의 PTE를 새 물리 페이지로 갱신, R/W 권한 부여
+  ⑦ 쓰기 명령어 재실행 → 성공
+
+  결과: 부모의 x와 자식의 x는 이제 서로 다른 물리 페이지
+  → 완전히 독립적인 값 유지
 ```
 
 ---
 
 ### Ch7. Dynamic Memory Allocation
 
-**블록 구조 (Implicit Free List)**
+**핵심 개념**
 
 ```
-┌──────────────────────────────────┐
-│  Header (4 bytes)                │
-│  [ size (30bits) | 00 | alloc ]  │
-│  하위 비트 = alloc bit            │
-├──────────────────────────────────┤
-│  Payload                         │
-│  (application data)              │
-├──────────────────────────────────┤
-│  Padding (optional)              │
-└──────────────────────────────────┘
+malloc: x86-64에서 16-byte 정렬 보장
+brk 포인터: 힙의 끝을 가리킴 (sbrk()로 증가)
 
-alloc=1: 할당된 블록
-alloc=0: 가용 블록
-size 추출: header & ~0x7
-alloc 추출: header & 0x1
+단편화:
+  내부(Internal): 블록 > 페이로드 (정렬 패딩, 헤더 오버헤드)
+  외부(External): 합계는 충분하나 연속 블록 없음 → Coalescing으로 해결
+
+블록 헤더 트릭:
+  16-byte 정렬 → size 하위 4bit = 항상 0
+  → alloc bit를 하위 비트에 저장 (공간 절약)
+  header = size | alloc  (예: size=32, alloc=1 → 0x21)
 ```
 
-**Segregated Free List 동작**
-
+3가지 가용 블록 추적 방법:
 ```
-크기 클래스별 가용 리스트:
-  [1-8]   → 리스트 1 → [8] → [8] → NULL
-  [9-16]  → 리스트 2 → [16] → NULL
-  [17-32] → 리스트 3 → [32] → [24] → NULL
-  [33~∞]  → 리스트 4 → [64] → [48] → NULL
-
-malloc(20) 요청:
-  1. [17-32] 클래스에서 first-fit 탐색 → 32 블록 발견
-  2. 32 → 20(할당) + 12(새 가용 블록)으로 split
-  3. 12는 [9-16] 클래스에 삽입
+Implicit List: 헤더로 전체 순회 → O(전체 블록) → 현대에 미사용
+Explicit List: free 블록에 prev/next → O(가용 블록) → 빠름
+Segregated:   크기 클래스별 리스트 → O(1) 근사, first-fit ≈ best-fit
 ```
 
-**예시 문제**
-
-Q. `malloc(100)` 후 `free(p)` 만 하고 병합(coalescing)을 하지 않으면 어떤 문제가 발생하는가?
+**★ 핵심 문제 1**: Coalescing과 False Fragmentation
 
 ```
-A. False Fragmentation 발생.
-   예: [free:50][alloc:100][free:50] → free 후
-       [free:50][free:100][free:50]
-   병합 없으면 각각 50, 100, 50으로 유지.
-   malloc(120) 요청 시 → 합계 200으로 충분하지만
-   연속 블록 최대 100 → 할당 실패!
-   → Immediate Coalescing 또는 Deferred Coalescing 필요
+Q. 아래 상태에서 malloc(6*SIZ)를 요청하면 성공하는가? 
+   (합계 가용 메모리 = 8*SIZ인데도)
+   [free:4] [alloc:8] [free:4]  (단위: SIZ)
+
+A. 실패한다. (External Fragmentation)
+   각 가용 블록 크기: 4*SIZ, 4*SIZ
+   연속된 가용 블록 없음 → malloc(6*SIZ) 불가
+
+   해결: Coalescing (인접 가용 블록 합병)
+   free() 직후 인접 블록이 가용이면 합병:
+   [free:4] + [free:4] → [free:8] → malloc(6*SIZ) 성공
+
+   False Fragmentation 발생 조건:
+   free() 후 인접 블록이 가용인데 합병하지 않은 경우
+
+   정책:
+     Immediate Coalescing: free() 즉시 합병 (단순)
+     Deferred Coalescing: 나중에 일괄 합병 (성능 향상 가능)
+```
+
+**★ 핵심 문제 2**: Heap Overflow → Arbitrary Write
+
+```
+Q. Heap Overflow가 어떻게 임의 메모리 쓰기(Arbitrary Write)로 이어지는가?
+
+A. K&R malloc의 free list 구조:
+   [allocated][free chunk: prev|next][allocated]
+
+   free() 시 인접 블록 합병:
+     node->prev->next = node->next;  ← 이 코드가 핵심
+
+   공격자가 allocated 블록을 overflow로 다음 free 블록의 prev/next를 덮어씀:
+     prev = 공격자 원하는 주소 A
+     next = 공격자 원하는 값 B
+
+   free() 호출 시:
+     A->next = B  → 주소 A에 값 B를 씀 = Arbitrary Write!
+
+   실제 공격: GOT(Global Offset Table) 주소를 A로,
+              shellcode 주소를 B로 설정 → 제어 흐름 탈취
+```
+
+**★ 핵심 문제 3**: Use-After-Free 익스플로잇
+
+```
+Q. Use-After-Free가 어떻게 제어 흐름 탈취로 이어지는가?
+
+A. 단계별 공격:
+   ① Doc 객체 생성, Body 객체 생성
+   ② doc->child = body (포인터 연결)
+   ③ delete body  → body 해제 (doc->child는 dangling pointer)
+   ④ 공격자가 해제된 메모리 영역에 fake Body 객체 스프레이 (Heap Spray)
+      fake Body의 vtable pointer = 공격자 제어 가능
+   ⑤ doc->child->getAlign() 호출
+      → doc->child (dangling) → fake Body의 vtable 접근
+      → 공격자의 코드 실행
+
+   핵심: C++ virtual function은 vtable을 통해 호출
+         vtable pointer를 제어하면 = 제어 흐름 탈취
 ```
 
 ---
 
 ### Ch8. Exceptions
 
-**예외 처리 흐름**
+**핵심 개념**
 
+4가지 예외 분류 (★ 항상 출제):
 ```
-User Code 실행 중 이벤트 발생
-         │
-         ▼
-  CPU → Exception Table[k] 조회
-         │
-         ▼
-  커널 Exception Handler 실행
-         │
-    ┌────┴────────────────────┐
-    │ Interrupt / Trap        │ → I_next로 복귀
-    │ Fault (복구 가능)        │ → I_current 재실행
-    │ Fault (복구 불가) / Abort│ → 프로세스 종료
-    └──────────────────────────┘
+          | 발생원인     | 동기/비동기 | 의도성   | 복귀 위치
+Interrupt | 외부 장치    | 비동기     | -       | I_next
+Trap      | 명령어 실행  | 동기       | 의도적   | I_next
+Fault     | 명령어 실행  | 동기       | 비의도   | I_current 재실행 or Abort
+Abort     | 명령어 실행  | 동기       | 비의도   | Abort (종료)
 ```
 
-**System Call 흐름 (open 예시)**
+System Call 동작:
+```
+%rax = syscall 번호 (read=0, write=1, open=2, fork=57, execve=59, _exit=60, kill=62)
+%rdi, %rsi, %rdx, %r10, %r8, %r9 = 인자 1~6
+syscall 명령어 → Trap → 커널 → 서비스 수행
+반환값 → %rax (음수 = 오류)
+```
+
+**★ 핵심 문제 1**: 예외 분류
 
 ```
-User: open("file.txt", O_RDONLY)
-  → libc: %eax = 2 (open syscall 번호)
-  → libc: syscall 명령어 실행
-  → Trap 예외 발생 → 커널 모드 전환
-  → 커널: syscall_table[2] = sys_open() 호출
-  → 파일 열기 수행
-  → 반환값 → %rax
-  → 유저 모드 복귀
+Q. 다음 각 상황을 예외 종류로 분류하고 복귀 위치를 설명하라.
+
+(a) 유저가 Ctrl-C를 누름
+(b) movl $0xd, 0x8049d10 실행 시 해당 페이지가 DRAM에 없음
+(c) 유저 프로그램이 open("file.txt", O_RDONLY) 호출
+(d) CPU가 불법 명령어를 만남
+
+A.
+(a) Interrupt (비동기, 외부 장치) → I_next 복귀
+    SIGINT 시그널이 해당 프로세스에 전달됨
+
+(b) Page Fault (Fault, 동기, 비의도)
+    → 복구 가능: 디스크에서 페이지 로드 후 I_current(movl) 재실행
+    → 복구 불가(유효하지 않은 주소): SIGSEGV 전달 후 Abort
+
+(c) System Call (Trap, 동기, 의도적) → I_next 복귀
+    %eax = 2(open), syscall 명령어 → 커널이 파일 열기
+
+(d) Abort (동기, 비의도) → 프로그램 종료
+```
+
+**★ 핵심 문제 2**: iret vs ret
+
+```
+Q. iret와 ret의 차이는?
+
+A.
+ret:  pop %rip    → 이전 코드로 복귀 (유저→유저 또는 커널→커널)
+
+iret: pop %rip    ← 기본 동작은 ret과 같음
+      pop CS      ← Code Segment 복원 (Ring level 결정)
+      pop RFLAGS  ← 플래그 레지스터 복원
+      pop %rsp    ← 스택 포인터 복원 (선택적)
+
+iret의 핵심: 권한 레벨(Ring 0↔Ring 3) 전환
+Page Fault 처리 후 iret → 유저 모드로 복귀 + 권한 복원
 ```
 
 ---
 
 ### Ch9. Processes
 
-**fork() + execve() 패턴 (쉘 구현)**
+**핵심 개념**
+
+Process = Logical Control Flow + Private Address Space (2개의 핵심 추상화)
 
 ```
-쉘 main loop:
-  while(1):
-    read command
-    if (builtin) handle locally
-    else:
-      pid = fork()           ← 자식 생성
-      if (pid == 0):
-        execve(cmd, args)    ← 자식에서 새 프로그램 실행
-      else:
-        if (foreground):
-          waitpid(pid, ...)  ← 부모가 자식 종료 대기
-        else:
-          print pid          ← 백그라운드: 대기 없이 계속
+fork(): 1번 호출 2번 반환
+  → 부모: 자식 PID (양수)
+  → 자식: 0
+  → 실행 순서: 비결정적!
+  → 메모리: COW로 물리 페이지 공유 (쓰기 시 복사)
+
+execve(): 1번 호출 정상 반환 없음
+  → PID 유지, 열린 fd 유지 (O_CLOEXEC 제외)
+  → 코드/데이터/스택 교체
+
+wait(): 자식 종료 대기 + Zombie 회수
+zombie: 종료됐지만 wait()를 받지 못한 자식 (<defunct>)
+orphan: 부모보다 먼저 종료 → init(PID=1)이 입양하여 reaping
 ```
 
-**Process Graph 분석 방법**
+**★ 핵심 문제 1**: fork() 출력 분석
 
 ```
-fork() 후 가능한 출력 순서 분석:
+Q. 다음 코드의 가능한/불가능한 출력을 판별하라.
+   int main() {
+       printf("L0\n"); fork();
+       printf("L1\n"); fork();
+       printf("Bye\n");
+   }
 
-코드:
-  printf("L0"); fork(); printf("L1"); fork(); printf("Bye");
+A. Process Graph 분석:
+   fork() 후 두 흐름 각각 L1, Bye 출력
+   두 번째 fork() 후 또 두 흐름 각각 Bye 출력
 
-프로세스 트리:
-         [L0]
-          │ fork()
-    ┌─────┴─────┐
-  parent      child1
-  [L1]         [L1]
-    │ fork()    │ fork()
-  ┌─┴─┐       ┌─┴─┐
- P   C2       C3  C4
-[Bye][Bye]   [Bye][Bye]
+   총 출력: L0×1, L1×2, Bye×4
 
-총 출력: L0×1, L1×2, Bye×4
-가능한 순서: L0이 항상 첫 번째, 나머지는 비결정적
-불가능한 순서: L1이 L0보다 앞에 오는 경우
+   가능한 순서 조건:
+   - L0은 반드시 모든 출력 중 가장 먼저 (fork 전에 출력됨)
+   - 각 프로세스 내에서는 L1이 Bye보다 먼저
+   - 다른 프로세스 간 순서는 비결정적
+
+   ✓ L0 L1 Bye L1 Bye Bye Bye   (가능)
+   ✓ L0 L1 L1 Bye Bye Bye Bye   (가능)
+   ✗ L1 L0 Bye Bye L1 Bye Bye   (불가: L0이 먼저여야 함)
+   ✗ L0 Bye L1 ...               (불가: 같은 프로세스에서 L1이 Bye 전이어야 함)
+```
+
+**★ 핵심 문제 2**: Zombie vs Orphan
+
+```
+Q. Zombie와 Orphan Process를 구분하고 각각의 문제점을 설명하라.
+
+A.
+Zombie Process:
+  = 자식이 종료됐지만 부모가 wait()를 호출하지 않은 상태
+  = exit status 보존을 위해 일부 커널 자원 유지
+  = ps에서 <defunct>로 표시
+
+  문제: Zombie가 누적되면 커널의 프로세스 테이블이 고갈
+       → 새 프로세스 생성 불가 → 시스템 장애
+
+  해결: 부모가 wait() 또는 waitpid()로 Zombie 회수
+
+Orphan Process:
+  = 부모가 먼저 종료된 자식 프로세스
+  = init(PID=1)이 자동으로 입양 → init이 주기적으로 wait() 호출
+
+  문제: (상대적으로 덜 심각) init이 관리하므로 Zombie 누적 없음
+  실제 장기 실행 서버: 명시적 reaping 필요 (예: SIGCHLD 핸들러)
+```
+
+**★ 핵심 문제 3**: execve() 후 메모리 상태
+
+```
+Q. fork() 후 자식이 execve()를 호출하면 어떤 변화가 일어나는가?
+
+A.
+fork() 직후 자식:
+  = 부모의 주소 공간 복사본 (COW)
+  = 부모의 PID와 다른 새 PID
+  = 부모의 fd 테이블 복사
+
+execve("ls", args, env) 호출 후:
+  1. "ls" 실행 파일 로드
+  2. 새 페이지 테이블 초기화
+  3. .text, .data, .bss 영역 설정 (Private demand-zero 또는 file-backed)
+  4. 스택, 힙 초기화
+  5. %rip → ls의 entry point
+  6. PID 유지 ← 중요!
+  7. 열린 fd 유지 ← 이것이 I/O 리다이렉션의 핵심!
+  8. 정상 반환 없음 (오류 시에만 -1 반환)
 ```
 
 ---
 
 ### Ch10. Signals
 
-**시그널 상태 비트벡터**
+**핵심 개념**
 
 ```
-커널이 각 프로세스마다 유지:
-
-pending  비트벡터: [ 0 0 1 0 0 0 1 0 ... ]
-                         ↑       ↑
-                    SIGSEGV    SIGCHLD pending
-
-blocked  비트벡터: [ 0 0 0 0 0 0 1 0 ... ]
-                                 ↑
-                            SIGCHLD blocked
-
 pnb = pending & ~blocked
-    = 실제로 처리할 시그널 집합
+→ 0이 아니면 가장 낮은 번호 시그널부터 처리
 
-처리 시: 가장 낮은 번호의 bit부터 처리
+큐 없음: 같은 타입은 최대 1개만 pending
+         → 여러 번 전송해도 1번만 처리됨
+
+Implicit Blocking:
+  핸들러 실행 중 → 같은 타입 시그널 자동 차단
+  핸들러 종료 시 → 차단 해제
+
+async-signal-safe: write, kill, _exit ✓
+                   printf, malloc, sprintf ✗ (내부 락 사용)
 ```
 
-**SIGCHLD 핸들러 패턴**
+**★ 핵심 문제 1**: SIGCHLD 핸들러에서 while 루프가 필요한 이유
 
-```c
+```
+Q. SIGCHLD 핸들러에서 while 루프와 WNOHANG을 사용하는 이유는?
+
 void sigchld_handler(int sig) {
-    int status;
-    pid_t pid;
-    // WNOHANG: 이미 종료된 자식만 처리, 블로킹 없음
-    // pid=-1: 임의의 자식 프로세스
-    while ((pid = waitpid(-1, &status, WNOHANG)) > 0) {
-        // zombie 회수 완료
-    }
+    while (waitpid(-1, NULL, WNOHANG) > 0) ;  // ← while 필요!
 }
-// 반드시 while 루프 사용!
-// if 사용 시: 동시에 여러 자식 종료 → 1개만 처리
-// (시그널 큐 없음 → 나머지 zombie 누적)
+
+A.
+시그널 큐가 없기 때문.
+
+상황: 3개의 자식이 거의 동시에 종료
+→ 커널이 부모에게 SIGCHLD 전송
+→ 하지만 pending bit는 1개뿐 (큐 없음)
+→ SIGCHLD가 1번만 pending → 핸들러 1번만 실행
+
+if 사용 시 (잘못된 코드):
+  void sigchld_handler(int sig) {
+      waitpid(-1, NULL, WNOHANG);  // 1개만 회수
+  }
+  → 나머지 2개 zombie 누적!
+
+while + WNOHANG 사용 (올바른 코드):
+  while (waitpid(-1, NULL, WNOHANG) > 0) ;
+  → 한 번의 핸들러 호출에서 모든 terminated 자식 회수
+  → WNOHANG: 종료된 자식 없으면 즉시 반환 (블로킹 없음)
+```
+
+**★ 핵심 문제 2**: 시그널 핸들러 안전성
+
+```
+Q. 다음 시그널 핸들러의 문제점은?
+
+void handler(int sig) {
+    char *err_msg;
+    err_msg = (char *)malloc(24);    // 문제 1
+    strcpy(err_msg, "error caught");
+    printf("Handler: %s\n", err_msg); // 문제 2
+}
+
+A.
+문제 1: malloc은 async-signal-safe가 아님
+  → 메인 코드가 malloc 실행 중에 핸들러가 malloc 호출
+  → malloc 내부의 free list가 불일치 상태일 때 핸들러가 개입
+  → 힙 손상 또는 무한 루프
+
+문제 2: printf는 async-signal-safe가 아님
+  → 메인 코드가 printf 실행 중 (내부 락 보유)
+  → 핸들러가 printf 호출 → 같은 락 요청
+  → Deadlock!
+
+올바른 패턴:
+  volatile sig_atomic_t flag = 0;
+  void handler(int sig) {
+      flag = 1;  // 플래그만 설정 (async-signal-safe)
+  }
+  // 메인 루프에서 flag 확인하여 처리
 ```
 
 ---
 
 ### Ch11. Threads
 
-**스레드 메모리 공유 모델**
+**핵심 개념**
 
 ```
-프로세스 가상 주소 공간:
+스레드 전용: 레지스터(PC 포함), TID, 스택
+  ★ 스택은 VM 보호 없음 → 포인터로 타 스레드 스택 접근 가능
 
-높은 주소
-┌─────────────────────┐
-│  Kernel             │ ← 공유
-├─────────────────────┤
-│  Stack (Thread 2)   │ ← Thread 2 전용 (보호 없음!)
-│  Stack (Thread 1)   │ ← Thread 1 전용 (보호 없음!)
-├─────────────────────┤
-│  Shared Libraries   │ ← 공유
-├─────────────────────┤
-│  Heap               │ ← 공유 ★ 동기화 필요
-├─────────────────────┤
-│  .bss / .data       │ ← 공유 (전역변수, static)
-│  .text              │ ← 공유 (코드)
-└─────────────────────┘
-낮은 주소
+스레드 공유: 코드(.text), 전역/static 데이터, 힙, fd 테이블
 
-★ 스택은 VM으로 보호 안됨 → 포인터로 타 스레드 스택 접근 가능
+생성 비용: 프로세스 ~20K cycles, 스레드 ~10K cycles
+구조: 피어(peer) 풀 (프로세스의 parent-child 트리와 다름)
+```
+
+공유 변수 판별 기준:
+```
+변수 x가 공유됨 ↔ 여러 스레드가 x의 어떤 인스턴스를 참조
+
+Global: 1개 인스턴스 → 항상 공유
+Local static: 1개 인스턴스 → 항상 공유
+Local (non-static): 스레드별 스택에 각자 → 공유 아님
+```
+
+**★ 핵심 문제 1**: 스레드 인자 전달 Race Condition
+
+```
+Q. 다음 코드의 문제점과 해결 방법은?
+
+for (int i = 0; i < N; i++)
+    pthread_create(&tids[i], NULL, thread, (void*)&i);  // 잘못됨
+
+void *thread(void *vargp) {
+    int myid = *((int*)vargp);  // &i 역참조
+    printf("Hello from thread %d\n", myid);
+}
+
+A. 문제: Race Condition
+  모든 스레드가 동일한 &i를 가리킴
+  main 루프가 i를 증가시키면 이미 생성된 스레드의 *vargp도 변함
+  → 여러 스레드가 같은 myid를 출력하거나 N을 출력하는 등 오동작
+
+해결 방법 1: malloc으로 각자 복사본 생성
+  long *p = malloc(sizeof(long));
+  *p = i;
+  pthread_create(&tids[i], NULL, thread, (void*)p);
+  // 스레드 내에서 free(vargp)
+
+해결 방법 2: 정수 캐스팅 (포인터 크기 ≥ int 크기 보장 시)
+  pthread_create(&tids[i], NULL, thread, (void*)(long)i);
+  // 스레드 내에서: int myid = (int)(long)vargp;
 ```
 
 ---
 
 ### Ch12. Synchronization
 
-**cnt++ Race 분석**
+**핵심 개념**
 
 ```
-cnt++ 어셈블리 분해:
-  L: movq cnt(%rip), %rdx    // %rdx = cnt
-  U: addq $1, %rdx           // %rdx++
-  S: movq %rdx, cnt(%rip)    // cnt = %rdx
+cnt++ Race:
+  L (load), U (update), S (store) 3단계가 비원자적
+  → 두 스레드가 인터리빙되면 업데이트 소실
 
-잘못된 인터리빙 (cnt=0에서 시작):
-Thread1: L1(rdx1=0)  U1(rdx1=1)            S1(cnt=1)
-Thread2:             L2(rdx2=0)  U2(rdx2=1)           S2(cnt=1)
-결과: cnt=1  (예상: cnt=2)  → Race Condition!
+Mutex: test_and_set 원자적 연산으로 구현
+  lock 비용: ~18배 성능 저하 (goodmcnt vs badcnt 실험)
 
-Progress Graph에서 Unsafe Region:
-  Thread1의 L1-U1-S1 구간과 Thread2의 L2-U2-S2 구간이 겹치는 영역
-  → Mutex로 해당 구간을 Critical Section으로 보호
+Semaphore: s ≥ 0 불변
+  wait(P): s>0이면 s--, 아니면 대기
+  post(V): s++, 대기 중 스레드 하나 깨움
+
+Deadlock 4조건: ME + Hold&Wait + No Preemption + Circular Wait
+→ 회피: 모든 스레드가 동일 순서로 락 획득
 ```
 
-**Producer-Consumer (n-element buffer)**
+**★ 핵심 문제 1**: Race Condition 추적
 
 ```
-구조:
-  sbuf_t {
-    int *buf;              // 원형 배열
-    int n, front, rear;    // 크기, 인덱스
-    pthread_mutex_t mutex; // 버퍼 접근 보호
-    sem_t empty_slots;     // 초기값 = n (빈 슬롯 수)
-    sem_t full_slots;      // 초기값 = 0 (찬 슬롯 수)
-  }
+Q. 두 스레드가 각각 cnt++를 1번씩 수행한다. cnt 초기값=0일 때
+   다음 인터리빙에서 최종 cnt 값은?
 
-sbuf_insert(item):
-  wait(empty_slots)   // 빈 슬롯 생길 때까지 대기
-  lock(mutex)         // 버퍼 잠금
-  buf[++rear % n] = item
-  unlock(mutex)       // 버퍼 해제
-  post(full_slots)    // 소비자에게 아이템 있음 알림
+Thread 1: L1 → U1 → H2 → L2 → U2 → S2 → S1
 
-sbuf_remove():
-  wait(full_slots)    // 아이템 생길 때까지 대기
-  lock(mutex)
-  item = buf[++front % n]
-  unlock(mutex)
-  post(empty_slots)   // 생산자에게 빈 슬롯 알림
-  return item
+A. 단계별 추적:
+   L1: %rdx1 = cnt = 0
+   U1: %rdx1 = 1 (아직 저장 안함)
+   H2: Thread 2 시작 (cnt는 아직 0)
+   L2: %rdx2 = cnt = 0
+   U2: %rdx2 = 1
+   S2: cnt = %rdx2 = 1
+   S1: cnt = %rdx1 = 1  ← Thread 1의 업데이트로 덮어씀!
+
+   최종 cnt = 1 (올바른 값은 2)
+   → Thread 1의 업데이트가 소실됨 (lost update)
 ```
 
-**Deadlock 예시 및 회피**
+**★ 핵심 문제 2**: Producer-Consumer Semaphore 추적
 
 ```
-Deadlock 발생 (락 순서 불일치):
-  Thread 0: wait(s0) → wait(s1) → cnt++ → post(s0) → post(s1)
-  Thread 1: wait(s1) → wait(s0) → cnt++ → post(s1) → post(s0)
+Q. 1-element buffer에서 초기 empty=1, full=0일 때
+   다음 실행 순서를 단계별로 추적하라:
+   P1: wait(empty), buf=10, post(full)
+   C1: wait(full), item=buf, post(empty)
+   P2: wait(empty), buf=20, post(full)
+   C2: wait(full), item=buf, post(empty)
 
-  가능한 상황:
-  T0: wait(s0) 성공(s0=0)
-  T1: wait(s1) 성공(s1=0)
-  T0: wait(s1) → s1=0 → 블로킹!
-  T1: wait(s0) → s0=0 → 블로킹!
-  → 영원히 대기 = Deadlock
+A.
+   초기: empty=1, full=0
 
-회피 (락 순서 통일):
-  Thread 0: wait(s0) → wait(s1) ...
-  Thread 1: wait(s0) → wait(s1) ...  ← 동일 순서
-  → Circular Wait 조건 제거 → Deadlock 불가
+   P1 wait(empty): empty: 1→0 (통과), buf = 10
+   P1 post(full):  full: 0→1
+
+   C1 wait(full):  full: 1→0 (통과), item = buf = 10
+   C1 post(empty): empty: 0→1
+
+   P2 wait(empty): empty: 1→0 (통과), buf = 20
+   P2 post(full):  full: 0→1
+
+   C2 wait(full):  full: 1→0 (통과), item = buf = 20
+   C2 post(empty): empty: 0→1
+
+   결과: C1이 10을, C2가 20을 소비 (올바름)
+   만약 P1 post 전에 C1이 wait하면: C1 블로킹 → P1 post → C1 진행
+```
+
+**★ 핵심 문제 3**: Deadlock 분석과 회피
+
+```
+Q. 다음 코드에서 Deadlock이 발생하는 시나리오를 설명하고 해결책을 제시하라.
+
+void *count(void *vargp) {
+    int id = (int)vargp;
+    wait(&mutex[id]);
+    wait(&mutex[1-id]);  // id=0이면 mutex[1], id=1이면 mutex[0]
+    cnt++;
+    post(&mutex[id]); post(&mutex[1-id]);
+}
+
+A. Deadlock 시나리오:
+   Thread 0: wait(mutex[0]) 성공 (mutex[0]=0)
+   Thread 1: wait(mutex[1]) 성공 (mutex[1]=0)
+   Thread 0: wait(mutex[1]) → mutex[1]=0 → 영원히 대기
+   Thread 1: wait(mutex[0]) → mutex[0]=0 → 영원히 대기
+   → Circular Wait → Deadlock!
+
+   Deadlock 4조건 확인:
+   ✓ ME: mutex는 하나씩만 보유 가능
+   ✓ Hold&Wait: mutex[0] 보유하면서 mutex[1] 대기
+   ✓ No Preemption: mutex는 자발적으로만 반납
+   ✓ Circular Wait: T0→mutex[1]→T1→mutex[0]→T0
+
+   해결: 동일 순서로 락 획득 (Circular Wait 제거)
+   wait(&mutex[0]); wait(&mutex[1]);  // 모든 스레드가 동일 순서
+   → T1도 mutex[0] 먼저 시도 → T0가 보유 중이면 대기
+   → T0가 완료 후 해제 → T1 진행 → Deadlock 없음
+```
+
+**★ 핵심 문제 4**: Thread Safety 분류
+
+```
+Q. 다음 함수들을 Thread Safety Class로 분류하라.
+   (Class 1: 공유변수 미보호, Class 2: 상태 유지, Class 3: unsafe 함수 호출)
+
+(a) int rand() { next = next*C + D; return next/E % F; }  (next는 static)
+(b) char *strtok(char *s, const char *d);  (내부에 static 버퍼 사용)
+(c) void bad_cnt() { cnt++; }  (cnt는 전역, 보호 없음)
+
+A.
+(a) Class 2: static 변수 next에 상태 저장 → 스레드 간 경쟁
+    해결: rand_r(unsigned int *nextp) — 상태를 인자로 전달
+
+(b) Class 2: 내부 static 버퍼에 상태 저장
+    해결: strtok_r(char *s, const char *d, char **saveptr)
+
+(c) Class 1: 공유 변수 cnt를 보호 없이 접근
+    해결: mutex로 cnt++ 보호
 ```
 
 ---
 
 ### Ch13. System-Level I/O
 
-**커널 파일 표현 구조**
+**핵심 개념**
 
 ```
-프로세스 A           공유 (커널)
-Descriptor Table    Open File Table      v-node Table
-┌────┬──────┐      ┌───────────────┐   ┌──────────────┐
-│ fd0│ stdin│─────→│ pos=0         │──→│ type: CHR    │
-│ fd1│stdout│─────→│ refcnt=1      │   │ size: ∞      │
-│ fd2│stderr│─────→│               │   └──────────────┘
-│ fd3│      │─────→├───────────────┤   ┌──────────────┐
-└────┴──────┘      │ pos=1024      │──→│ type: REG    │
-                   │ refcnt=1      │   │ size: 4096   │
-프로세스 B          └───────────────┘   └──────────────┘
-Descriptor Table
-┌────┬──────┐
-│ fd0│      │─────→ (fork 후 동일 Open File Entry 공유)
-│ fd1│      │─────→  refcnt가 2로 증가
-└────┴──────┘
+Everything is a file: 디스크, 터미널, 소켓, 커널(/proc) 모두 파일
+
+커널 파일 표현 3 테이블:
+  Descriptor Table (프로세스별): fd번호 → Open File Table 항목
+  Open File Table (전역 공유): file pos + refcnt + v-node 포인터
+  v-node Table (전역 공유): 실제 파일 메타데이터
+
+Short Count: read/write가 요청보다 적게 처리 → 오류 아님!
+  발생: EOF, 터미널 입력, 네트워크 소켓
+
+I/O 함수 선택:
+  디스크/터미널: Standard I/O (버퍼링 자동 처리)
+  시그널 핸들러: Unix I/O (async-signal-safe)
+  소켓: RIO (Short count 처리)
+  소켓 + Standard I/O: ❌ 금지
 ```
 
-**I/O 리다이렉션 구현**
+**★ 핵심 문제 1**: fork() 후 파일 공유
 
 ```
-$ ls > foo.txt  구현:
+Q. 다음 코드 실행 후 파일 디스크립터 상태를 설명하라.
+   fd = open("file.txt", O_RDONLY);
+   read(fd, &c1, 1);  // 'a' 읽음, pos=1
+   fork();
+   // 자식에서 read(fd, &c2, 1) 호출
 
-1. fork() → 자식 프로세스 생성
-2. [자식] fd3 = open("foo.txt", O_WRONLY|O_CREAT|O_TRUNC)
-3. [자식] dup2(fd3, 1)   → fd1(stdout)이 foo.txt를 가리킴
-                           이전 fd1(terminal) refcnt 감소
-4. [자식] close(fd3)     → fd3 불필요, 닫음
-5. [자식] execve("ls", ...) → ls의 stdout(fd=1)이 foo.txt에 쓰임
+A.
+fork() 전:
+  부모 DT: fd → OFT[A] (pos=1, refcnt=1)
+  
+fork() 후:
+  부모 DT: fd → OFT[A] (pos=1, refcnt=2)  ← 공유!
+  자식 DT:  fd → OFT[A] (pos=1, refcnt=2)  ← 동일 OFT 항목
 
-strace 확인:
-  openat(..., "foo.txt", O_WRONLY|O_CREAT|O_TRUNC) = 3
-  dup2(3, 1) = 1
-  close(3) = 0
-  execve("/usr/bin/ls", ...)
+자식이 read(fd, &c2, 1):
+  OFT[A].pos: 1→2
+  c2 = 'b' (pos=1에서 읽음)
+
+부모가 이후 read(fd, &c3, 1):
+  OFT[A].pos: 2→3  (자식이 이미 pos를 2로 변경!)
+  c3 = 'c'
+
+★ 핵심: fork 후 부모와 자식이 file pos를 공유
+   → 한쪽의 read가 다른 쪽의 읽기 위치에 영향을 줌
+   → 의도치 않은 동작의 원인이 될 수 있음
+```
+
+**★ 핵심 문제 2**: dup2() I/O 리다이렉션
+
+```
+Q. "ls > foo.txt" 명령을 구현하는 코드를 작성하고 각 단계의 fd 상태를 설명하라.
+
+A.
+단계별 구현:
+  // 1. fork()
+  if ((pid = fork()) == 0) {
+      // 자식 프로세스에서:
+      
+      // 2. foo.txt 열기 → fd=3 할당 (0,1,2는 이미 사용)
+      int fd = open("foo.txt", O_WRONLY|O_CREAT|O_TRUNC, 0666);
+      // fd 3 → OFT[B] (foo.txt, pos=0, refcnt=1)
+      // fd 1 → OFT[A] (terminal, pos=0, refcnt=2) ← 부모와 공유
+
+      // 3. dup2(fd, 1): fd1(stdout)이 foo.txt를 가리키게 함
+      dup2(fd, 1);
+      // dup2 동작:
+      //   fd 1이 가리키던 OFT[A] 닫음 (refcnt: 2→1)
+      //   fd 1 → OFT[B] (foo.txt) 연결 (refcnt: 1→2)
+      // fd 1 → OFT[B], fd 3 → OFT[B]
+
+      // 4. fd=3 닫기 (더 이상 불필요)
+      close(fd);
+      // fd 3 → NULL (OFT[B] refcnt: 2→1)
+      // fd 1 → OFT[B]  ← stdout이 foo.txt 가리킴
+
+      // 5. ls 실행 → ls의 stdout(fd=1)이 foo.txt에 쓰임
+      execve("/usr/bin/ls", args, environ);
+  }
+```
+
+**★ 핵심 문제 3**: Standard I/O 버퍼링과 fork()
+
+```
+Q. 다음 코드의 출력 결과는? (줄바꿈 없는 printf 주의)
+
+int main() {
+    printf("hello");  // '\n' 없음 → 버퍼에 저장
+    fork();
+    // 부모와 자식 모두 exit()
+}
+
+A.
+printf("hello"): '\n'이 없으므로 Standard I/O 버퍼에 저장
+  → 실제 write() 시스템 콜 호출 안됨
+
+fork() 후:
+  → 부모의 Standard I/O 버퍼("hello")가 자식에게도 복사됨!
+
+프로세스 종료 시(exit()):
+  → Standard I/O 버퍼 flush → write("hello") 호출
+
+결과: "hello"가 2번 출력!
+  (부모 1번 + 자식 1번)
+
+해결: fork() 전에 fflush(stdout) 또는 '\n' 사용
+  printf("hello\n");  // '\n'으로 즉시 flush
+  fork();             // 버퍼 비워진 후 fork
+  → "hello"가 1번만 출력
 ```
 
 ---
 
 ### Ch14. Debugger & ptrace
 
-**GDB 기반 Debugger 동작 흐름**
+**핵심 개념**
 
 ```
-GDB (Tracer)                    Target (Tracee)
-─────────────────────────────────────────────
-fork()
-  └─────────────────────────→ [자식 생성]
-                               PTRACE_TRACEME
-                               execve("target")
-                               → SIGTRAP 자동 발생 → 정지
-waitpid() ←── SIGTRAP ────────
-PTRACE_PEEKTEXT (코드 읽기)
-PTRACE_POKETEXT (0xcc 삽입)   ← 브레이크포인트 설정
-PTRACE_CONT ─────────────────→ [실행 재개]
-                               0xcc 실행 → SIGTRAP → 정지
-waitpid() ←── SIGTRAP ────────
-PTRACE_GETREGS (레지스터 읽기)
-  → %rip, %rsp 등 출력
-PTRACE_POKETEXT (원래 바이트 복원)
-PTRACE_SINGLESTEP ───────────→ [명령어 1개 실행 → 정지]
-waitpid() ←── SIGTRAP ────────
-... 반복
+ptrace: tracer(GDB)가 tracee(디버깅 대상)의 메모리/레지스터 완전 제어
+API: long ptrace(request, pid, addr, data)
+
+GDB 동작 흐름:
+  fork() → 자식: PTRACE_TRACEME → execve() → SIGTRAP(자동) → 정지
+  부모(GDB): waitpid() → PTRACE_POKETEXT(0xcc) → PTRACE_CONT
+  → 브레이크 도달 → SIGTRAP → PTRACE_GETREGS → 복원 → PTRACE_SINGLESTEP
+
+strace: PTRACE_SYSCALL로 syscall 진입/탈출 추적
 ```
 
-**Software Breakpoint 동작**
+Breakpoint 3종:
+```
+Software: int 3(0xcc) 삽입 → SIGTRAP / 무제한 / 코드 수정 필요
+Hardware: DR0~DR3 레지스터 / 최대 4개 / 코드 수정 불필요
+Memory:   페이지 권한 변경 → Protection Fault / 읽기/쓰기 접근 감지
+```
+
+**★ 핵심 문제 1**: Software Breakpoint 설정/해제 절차
 
 ```
-브레이크포인트 설정:
-  원래 바이트 저장: orig = PTRACE_PEEKTEXT(pid, addr)
-  0xcc 삽입:       PTRACE_POKETEXT(pid, addr, 0xcc)
+Q. GDB가 주소 0x400500에 Software Breakpoint를 설정하고
+   실행 후 계속 진행할 때의 전체 절차를 설명하라.
 
-실행 중 0xcc 만남:
-  CPU → SIGTRAP 예외 → GDB가 수신
+A.
+[설정]
+  1. orig = PTRACE_PEEKTEXT(pid, 0x400500)  // 원래 바이트 저장
+  2. PTRACE_POKETEXT(pid, 0x400500, (orig & ~0xff) | 0xcc)
+     // 첫 바이트를 0xcc로 교체
+  3. PTRACE_CONT  // 실행 재개
 
-브레이크포인트 해제 (재실행 전):
-  PTRACE_POKETEXT(pid, addr, orig)  // 원래 바이트 복원
-  PTRACE_SETREGS: %rip를 addr로 설정 // 해당 명령어부터 재실행
-  PTRACE_SINGLESTEP                  // 1개 실행
-  다시 0xcc 삽입                      // 브레이크포인트 복원
+[실행 중]
+  4. CPU가 0x400500 도달 → 0xcc 실행
+  5. CPU: SIGTRAP 예외 발생 → 프로세스 정지
+  6. GDB: waitpid() 반환
+
+[상태 확인 및 계속 진행]
+  7. PTRACE_GETREGS  // 현재 레지스터 값 확인
+     (이 때 %rip = 0x400501, 0xcc 다음 주소)
+  8. PTRACE_POKETEXT(pid, 0x400500, orig)  // 원래 바이트 복원
+  9. PTRACE_SETREGS (rip = 0x400500)       // PC를 브레이크 주소로 되돌림
+  10. PTRACE_SINGLESTEP  // 0x400500의 원래 명령어 1개 실행
+  11. waitpid() → SIGTRAP
+  12. PTRACE_POKETEXT(pid, 0x400500, 0xcc)  // 브레이크포인트 재설정
+  13. PTRACE_CONT  // 계속 실행
+```
+
+**★ 핵심 문제 2**: ptrace Request 구분
+
+```
+Q. 다음 각 상황에서 어떤 ptrace request를 사용해야 하는가?
+
+(a) tracee의 특정 주소에서 값을 읽기
+(b) tracee의 %rax 값을 수정하기
+(c) 다음 syscall이 실행될 때까지 tracee를 실행
+(d) 명령어 1개만 실행하고 정지
+(e) 자신을 디버깅 받도록 설정 (자식 초기화 시)
+
+A.
+(a) PTRACE_PEEKTEXT 또는 PTRACE_PEEKDATA
+(b) PTRACE_SETREGS (전체 레지스터 구조체 덮어쓰기)
+(c) PTRACE_SYSCALL
+(d) PTRACE_SINGLESTEP
+(e) PTRACE_TRACEME
 ```
 
 ---
 
 ### Ch15. Security Attacks
 
-**Cold Boot Attack 흐름**
+**핵심 개념**
 
 ```
-신뢰 경계 (OS 신뢰 시):
+Cold Boot:  DRAM 냉각(-50°C) → 0.2% 미만 손실 → 키 추출
+            대응: TRESOR(키를 CPU 레지스터에만 유지)
 
-  CPU Registers  ─┐
-  CPU Cache      ─┤ Trusted
-  ────────────────┤
-  DRAM           ─┤ ← 암호화 키가 일시적으로 존재!
-  Flash/HDD      ─┘ Untrusted (암호화된 데이터)
+Timing SC:  strcmp 조기 반환 → 일치 수에 비례 시간 증가
+            복잡도: 52^9 → 52×9
+            대응: constant-time 비교
 
-공격:
-  DRAM을 -50°C로 냉각
-  → DIMM 슬롯에서 분리 (1분 내 0.2% 미만 손실)
-  → 다른 머신에 삽입
-  → DRAM 내용 덤프 → 암호화 키 추출
+Flush+Reload: clflush → victim 접근 대기 → reload 시간 측정
+              cache hit = victim이 접근함
 
-대응: TRESOR
-  AES 키 → CPU 레지스터(DR0~DR3)에만 유지
-  DRAM으로 절대 내려가지 않음
+Meltdown:   Speculative Exec + cache covert-channel
+            권한 검사 전 커널 주소 투기적 실행 → 캐시에 흔적
+            대응: KPTI(커널/유저 PT 분리, 5~20% 저하)
+
+Rowhammer:  인접 Row 반복 접근 → 비트 플립
+            도전1: clflush로 cache bypass
+            도전2: VA 하위 12bit = PA 하위 12bit → 인접 row 역공학
 ```
 
-**Meltdown 공격 메커니즘**
+**★ 핵심 문제 1**: Timing Side-Channel 복잡도 계산
 
-```c
-// 단순화된 Meltdown PoC
+```
+Q. 9자리 비밀번호 (대소문자 알파벳 52자 중)를 Timing Attack으로 크래킹할 때
+   최대 시도 횟수는? 무작위 추측과 비교하라.
+
+A.
+무작위 추측:
+  전체 경우의 수 = 52^9 ≈ 2.3 × 10^15
+  평균 시도: 52^9 / 2 ≈ 10^15 → 사실상 불가능
+
+Timing Attack (strcmp 조기 반환 이용):
+  1번째 자리: 52가지 시도 → 시간이 가장 오래 걸리는 것 선택
+  2번째 자리: 52가지 시도 (1번째 자리 고정)
+  ...
+  9번째 자리: 52가지 시도
+
+  총 시도: 52 × 9 = 468 → 현실적으로 가능!
+
+비교: 2.3×10^15 vs 468 → 약 5×10^12배 차이
+```
+
+**★ 핵심 문제 2**: Meltdown 공격 단계 분석
+
+```
+Q. 다음 Meltdown PoC 코드에서 각 단계를 설명하라.
+
 char user_array[255 * 4096];
+// (A) clflush로 user_array 전체 캐시 비우기
+char secret = *(char *)0xffffffff81a000e0;  // (B)
+maccess(user_array[secret * 4096]);          // (C)
+// (D) for문으로 user_array 각 인덱스 접근 시간 측정
 
-// Step 1: user_array 캐시 전체 flush
-for (int i = 0; i < 255; i++)
-    clflush(&user_array[i * 4096]);
+A.
+(A) Flush 단계:
+    user_array의 모든 캐시 라인을 clflush로 제거
+    → 이후 어느 캐시 라인이 로드됐는지 구분 가능하게 준비
 
-// Step 2: Transient Execution (투기적 실행)
-// 커널 주소 접근 → 권한 위반이지만 즉시 예외 안 남
-char secret = *(char *)0xffffffff81a000e0;  // kernel addr
-// secret 값을 인덱스로 user_array 접근 → 해당 캐시 라인 로드
-maccess(user_array[secret * 4096]);
-// 예외 처리: secret 접근은 커밋 안됨 → 레지스터 롤백
-// BUT: 캐시 상태는 롤백 안됨!
+(B) 투기적 실행 (Transient Execution):
+    0xffff...은 커널 주소 → 유저 접근 불가
+    BUT: CPU는 권한 검사를 나중에 수행 (투기적으로 먼저 실행)
+    → CPU가 실제로 커널 메모리에서 값을 읽어 secret에 저장
+    → 이후 권한 위반으로 예외 처리, secret 레지스터 롤백
 
-// Step 3: Flush+Reload로 secret 복원
-for (int i = 0; i < 255; i++) {
-    t = get_access_time(&user_array[i * 4096]);
-    if (t < threshold)  // cache hit!
-        recovered_secret = i;  // secret == i
-}
+(C) Covert Channel (정보 전송):
+    secret 값(0~254)을 user_array 인덱스로 사용
+    → user_array[secret × 4096] 캐시 라인이 로드됨
+    → 예외 처리 후에도 캐시 상태는 유지됨! ← 핵심
+
+(D) Flush+Reload (정보 수신):
+    각 index의 user_array[index×4096] 접근 시간 측정
+    → 유일하게 빠른(cache hit) index = secret 값
+    → 커널 메모리 값 복원 완료!
+
+핵심 원리: 캐시 상태는 예외 처리 시 롤백되지 않음
 ```
 
-**Rowhammer 공격 구조**
+**★ 핵심 문제 3**: Rowhammer 공격 단계
 
 ```
-DRAM 물리 구조:
-  Bank 0:  Row 0 | Row 1 | Row 2 | Row 3 | ...
-           ─────   ─────   ─────   ─────
-  aggressor rows: Row 0, Row 2 (반복 접근)
-  victim row:     Row 1 (비트 플립 발생)
+Q. Rowhammer로 Linux 커널 권한 상승을 달성하는 절차를 설명하라.
 
-공격 코드:
-  while (1):
-    access(row_A)    // DRAM에 직접 접근
-    access(row_B)    // (Row 1 인접한 양쪽)
-    clflush(row_A)   // 캐시 bypass (L1/L2/L3 우회)
-    clflush(row_B)   // → 매번 DRAM 직접 접근 강제
+A.
+목표: PTE(Page Table Entry)의 비트를 플립하여 커널 메모리 접근
 
-Linux 권한 상승:
-  PTE 비트 플립 → PPN 변경 → 다른 물리 페이지 접근
-  RW bit(1bit) 플립 확률: 1/64 ≈ 2%
-  PPN(20bit) 플립 확률:  20/64 ≈ 31%
+도전 극복:
+  #1 Cache bypass: clflush로 매번 캐시 비우기
+     → 반복 접근이 DRAM에 직접 도달하여 Row 활성화 발생
+
+  #2 Address info: VA 하위 12bit = PA 하위 12bit 이용
+     → 대량 메모리 할당 후 주소 패턴 역공학
+     → 인접 Physical Row에 해당하는 VA 파악
+
+공격 단계:
+  ① 대량 메모리 할당 (2GB 등)
+  ② Rowhammer: 인접 Row A, B를 반복 접근 (clflush 포함)
+     while(1): access(A); access(B); clflush(A); clflush(B);
+  ③ Victim Row에서 비트 플립 발생 위치 탐색
+  ④ 해당 메모리를 커널에 반환 (free)
+  ⑤ 커널이 반환 메모리를 PTE 배열로 사용하도록 유도
+     (대량의 mmap 호출로 PTE 확장 강제)
+  ⑥ Rowhammer: 비트 플립 발생!
+     - RW bit 플립(2% 확률): 쓰기 권한 획득
+     - PPN 비트 플립(31% 확률): 다른 물리 페이지(커널) 접근
+  ⑦ 커널 물리 페이지에 직접 읽기/쓰기 → 권한 상승 완료
 ```
-
----
 
 ## ⑤ 시험 대비 체크리스트
 
