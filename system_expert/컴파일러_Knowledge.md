@@ -1,6 +1,6 @@
 # 컴파일러 Knowledge
 
-> 삼성DS 시스템 전문가 과정 — 컴파일러 (문수묵 교수) | 마지막 업데이트: Ch1~3
+> 삼성DS 시스템 전문가 과정 — 컴파일러 (문수묵 교수) | 마지막 업데이트: Ch1~4
 
 ---
 
@@ -14,6 +14,11 @@
 | IN[b] = USE[b] ∪ (OUT[b] − DEF[b]) | USE=locally exposed uses, DEF=BB b에서 정의된 변수, OUT=b 출구 시 live 변수 | Backward 분석. DEF는 BB 내 정의된 모든 변수 | LV |
 | OUT[b] = ∪ IN[s], ∀ succ s | IN[s]=후계자 s의 진입 live 변수 | 합류점에서 union (어떤 후속 경로든 사용되면 live) | LV |
 | Speedup = T_old / T_new | T_old=최적화 전, T_new=최적화 후 | Speedup>1이면 개선 | 최적화 비교 |
+| x ≤ y ⟺ x ∧ y = x | x가 y보다 격자에서 아래(또는 같은 위치) | ∧=∪이면 y⊆x, ∧=∩이면 x⊆y | 반순서 |
+| 단조: x≤y → f(x)≤f(y) | 입력이 내려가면 출력도 내려감 | 수렴 보장 핵심. f(x∧y)≤f(x)∧f(y)와 동치 | 프레임워크 |
+| 분배: f(x∧y)=f(x)∧f(y) | 합치고적용 = 적용하고합치기 | 성립→MFP=MOP. RD,LV는 분배적 | 프레임워크 |
+| FP ≤ MFP ≤ MOP ≤ Perfect | 해의 계층 | 분배적→MFP=MOP, 단조→MFP≤MOP | 정밀도 |
+| rPO(i) = N − PostOrder(i) | DFS post-order 뒤집기 | Forward 분석 최적 방문 순서. 평균 ~2.75회 수렴 | 속도 |
 
 ## ② 핵심 비교표
 
@@ -69,6 +74,25 @@
 | Copy Propagation | 사용처를 원본으로 교체 | 항상 가능 | 없음 |
 | Copy Coalescing | 소스/타겟 LR 합쳐 같은 레지스터 | LR이 간섭 안 해야 함 | 간선 증가→컬러링 어려움 |
 
+### 데이터 흐름 분석 프레임워크 성질 비교
+
+| 분석 | meet(∧) | 방향 | 단조? | 분배? | MFP vs MOP |
+|------|---------|------|-------|-------|------------|
+| Reaching Definitions | ∪ (union) | Forward | O | O | MFP = MOP |
+| Live Variables | ∪ (union) | Backward | O | O | MFP = MOP |
+| Available Expressions | ∩ (intersection) | Forward | O | O | MFP = MOP |
+| Constant Propagation | 특수 meet | Forward | O | **X** | MFP < MOP |
+
+### 격자 방향 비교 (∧=∪ vs ∧=∩)
+
+| 항목 | ∧ = ∪ (RD, LV) | ∧ = ∩ (Available Expr) |
+|------|-----------------|------------------------|
+| Top(⊤) | {} (빈 집합) | 전체 집합 |
+| Bottom(⊥) | 전체 집합 | {} (빈 집합) |
+| ≤ 의미 | y⊆x (큰 집합이 아래) | x⊆y (작은 집합이 아래) |
+| 초기값 | ⊤ = {} | ⊤ = 전체 |
+| 반복 방향 | 집합이 커지면서 내려감 | 집합이 작아지면서 내려감 |
+
 ## ③ 용어 정의
 
 | 용어 | 정의 |
@@ -103,6 +127,21 @@
 | Transfer Function | BB 통과 시 데이터 흐름 정보 변화 함수 |
 | USE[b] | BB b의 locally exposed uses 집합 |
 | Worklist Algorithm | 변화 노드만 재계산. 고정점까지 수렴 |
+| Descending Chain | 격자에서 x₀≥x₁≥...≥xₙ인 수열. 유한하면 수렴 보장 |
+| Distributive | f(x∧y)=f(x)∧f(y). 반복 알고리즘이 MOP과 동일한 해를 줌 |
+| GLB (Greatest Lower Bound) | x,y 모두보다 ≤이면서 가장 큰 원소. x∧y가 유일한 glb |
+| Height (격자 높이) | 가장 긴 하강 체인의 길이. RD에서 정의 수와 같음 |
+| Lattice (격자) | 모든 원소 쌍이 유일한 glb와 lub를 가지는 반순서 집합 |
+| MFP (Maximum Fixed Point) | 반복 알고리즘이 수렴한 결과. 모든 고정점 중 가장 큰 것 |
+| Monotone (단조) | x≤y→f(x)≤f(y). 입력이 내려가면 출력도 내려감. 수렴 보장 |
+| MOP (Meet Over all Paths) | 모든 가능한 경로에 대해 meet한 해. MFP≤MOP≤Perfect |
+| NAC | Not A Constant. 상수 전파에서 상수가 아닌 값 |
+| Partial Ordering (반순서) | 반사적+반대칭+추이적인 이항 관계 |
+| Reverse Post-Order | DFS post-order를 뒤집은 순서. Forward 분석 최적 방문 순서 |
+| Semi-Lattice (반격자) | Top 존재+유일한 glb 존재. meet 연산자의 4성질에서 도출 |
+| Top (⊤) | x∧⊤=x인 원소. 격자의 최상위. 초기값으로 사용 |
+| Bottom (⊥) | x∧⊥=⊥인 원소. 격자의 최하위 |
+| UNDEF | 상수 전파에서 아직 값이 정해지지 않은 상태 (Top) |
 
 ### RISC 명령어 레퍼런스 (HP PA-RISC 기반)
 
@@ -833,6 +872,252 @@ intersection을 쓰면: "모든 경로에서" → Available Expression에 사용
 
 **[풀이]**: 정의 d가 경로 A로만 도달하고 경로 B로는 도달하지 않으면, intersection은 d를 제외. 하지만 런타임에 경로 A가 실행되면 d가 실제로 도달 → d를 무시하면 잘못된 최적화 (예: d가 도달 안 한다고 가정하고 다른 값을 사용). union이 안전.
 
+#### Ch3 응용문제: Live Variables 전체 풀이
+
+**[문제]** RD 예제와 같은 CFG에서 USE/DEF 계산 후 LV의 IN/OUT을 구하라.
+
+**[Step 1] USE/DEF 계산** — 한 줄씩 추적:
+```
+B1: d1: i=m-1  → 읽기:m(exposed!) 쓰기:i
+    d2: j=n    → 읽기:n(exposed!) 쓰기:j
+    d3: a=u1   → 읽기:u1(exposed!) 쓰기:a
+    → USE={m,n,u1}, DEF={i,j,a}
+
+B2: d4: i=i+1  → 읽기:i(exposed! 정의 전 사용) 쓰기:i
+    d5: j=j-1  → 읽기:j(exposed! 정의 전 사용) 쓰기:j
+    → USE={i,j}, DEF={i,j}
+    주의: i=i+1에서 오른쪽 i(읽기)가 왼쪽 i(쓰기)보다 먼저!
+
+B3: d6: a=u2   → 읽기:u2(exposed!) 쓰기:a
+    → USE={u2}, DEF={a}
+
+B4: d7: i=u3   → 읽기:u3(exposed!) 쓰기:i
+    → USE={u3}, DEF={i}
+```
+
+**[Step 2] successor 관계**: B1→B2, B2→{B3,B4}, B3→B2, B4→exit
+
+**[Step 3] 반복 (Backward)** 초기: IN[exit]={}, 모든 IN={}:
+```
+1회차 (뒤에서부터):
+  B4: OUT=IN[exit]={} → IN={u3}∪({}−{i})={u3}                    변화!
+  B3: OUT=IN[B2]={} → IN={u2}∪({}−{a})={u2}                      변화!
+  B2: OUT=IN[B3]∪IN[B4]={u2}∪{u3}={u2,u3}
+      IN={i,j}∪({u2,u3}−{i,j})={i,j,u2,u3}                       변화!
+  B1: OUT=IN[B2]={i,j,u2,u3}
+      IN={m,n,u1}∪({i,j,u2,u3}−{i,j,a})={m,n,u1,u2,u3}           변화!
+
+2회차 (B2의 IN이 변했으므로 B3 재계산):
+  B3: OUT=IN[B2]={i,j,u2,u3}
+      IN={u2}∪({i,j,u2,u3}−{a})={i,j,u2,u3}                      변화!
+  B2: OUT={i,j,u2,u3}∪{u3}={i,j,u2,u3}
+      IN={i,j}∪({i,j,u2,u3}−{i,j})={i,j,u2,u3}                   변화없음→수렴!
+```
+
+**[최종 답]**:
+```
+  B1: OUT={i,j,u2,u3}      IN={m,n,u1,u2,u3}
+  B2: OUT={i,j,u2,u3}      IN={i,j,u2,u3}
+  B3: OUT={i,j,u2,u3}      IN={i,j,u2,u3}
+  B4: OUT={}                IN={u3}
+```
+
+해석: B2에서 i,j가 live → B2 내 i=i+1, j=j-1에서 사용. u2,u3는 B3,B4에서 사용되며 B2를 통과해 전파됨.
+
+---
+
+### Ch4. Foundations of Data Flow Analysis — 수학적 기초
+
+#### 4-1. 통합 프레임워크: (V, ∧, F)
+
+```
+모든 데이터 흐름 분석은 3가지로 정의:
+
+  V = 값의 도메인     (예: 정의 집합, 변수 집합)
+  ∧ = meet 연산자     (예: ∪, ∩)
+  F = 전달 함수 집합   (예: GEN∪(x−KILL))
+
+같은 성질을 가진 문제들에 대해
+수렴·정확성·정밀도·속도를 한번에 증명 가능!
+```
+
+**[예시문제]** RD의 (V, ∧, F)는?
+
+**[풀이]**: V = {x | x ⊆ {d₁,...,dₙ}}, ∧ = ∪, F: f(x) = GEN ∪ (x − KILL)
+
+#### 4-2. Meet 연산자의 4가지 성질과 반순서
+
+```
+∧가 만족해야 하는 성질:
+  교환: x ∧ y = y ∧ x
+  멱등: x ∧ x = x
+  결합: x ∧ (y ∧ z) = (x ∧ y) ∧ z
+  Top:  x ∧ ⊤ = x
+
+이 4성질로부터 반순서(≤)를 정의:
+  x ≤ y  ⟺  x ∧ y = x
+  "x가 y보다 격자에서 아래(또는 같은 위치)"
+```
+
+**[예시문제]** ∧=∪일 때, {d1,d2} ≤ {d1}인가?
+
+**[풀이]**: {d1,d2} ∧ {d1} = {d1,d2} ∪ {d1} = {d1,d2} = 왼쪽과 같음 → **YES**. 큰 집합이 격자에서 아래.
+
+#### 4-3. 격자 다이어그램
+
+```
+∧ = ∪ (RD)일 때:                    ∧ = ∩ (Available Expr)일 때:
+
+        {}          ← ⊤                {d1,d2,d3}     ← ⊤
+     /  |  \                           /    |    \
+  {d1} {d2} {d3}                   {d1,d2} {d1,d3} {d2,d3}
+   / \  / \  / \                     \ /    \ /    \ /
+{d1,d2}{d1,d3}{d2,d3}              {d1}   {d2}   {d3}
+      \  |  /                          \    |    /
+    {d1,d2,d3}    ← ⊥                   {}          ← ⊥
+
+∪: 큰 집합=아래, ⊤={}              ∩: 작은 집합=아래, ⊤=전체
+반복: 집합이 커지며 내려감           반복: 집합이 작아지며 내려감
+```
+
+**[예시문제]** ∧=∪에서 {d1}과 {d2}의 glb(최대하한)는?
+
+**[풀이]**: {d1} ∧ {d2} = {d1} ∪ {d2} = {d1,d2}. 격자에서 {d1}과 {d2} 아래에서 가장 높은 원소.
+
+#### 4-4. 격자 높이와 유한 하강 체인
+
+```
+하강 체인: x₀ ≥ x₁ ≥ x₂ ≥ ... ≥ xₙ (격자에서 내려가는 수열)
+격자 높이: 가장 긴 하강 체인의 길이
+
+RD (정의 3개): 높이 = 3
+  {} → {d1} → {d1,d2} → {d1,d2,d3}  (최대 3단계)
+
+상수 전파: 높이 = 2 (무한한 상수값이지만!)
+  UNDEF → 상수값 → NAC  (최대 2단계)
+       ↓         ↓
+    UNDEF         NAC
+  / | | | \     (⊤)  (⊥)
+ -2 -1 0 1 2
+
+유한 높이 → 영원히 내려갈 수 없음 → 반드시 수렴!
+```
+
+#### 4-5. 단조성 — 수렴 보장의 열쇠
+
+```
+단조(monotone): x ≤ y → f(x) ≤ f(y)
+  "입력이 내려가면 출력도 내려간다"
+
+동치 표현: f(x ∧ y) ≤ f(x) ∧ f(y)
+  합치고 적용 ≤ 적용하고 합치기
+
+수렴 증명:
+  반복 1회:  IN₁ ──f──→ OUT₁    ← ⊤에서 시작
+  반복 2회:  IN₂ ──f──→ OUT₂    ← IN₂ = meet(OUT₁들) ≤ IN₁
+  반복 3회:  IN₃ ──f──→ OUT₃    ← IN₃ ≤ IN₂
+  ...
+  매번 ≤ 방향(아래)으로만 이동 + 높이 유한 → 반드시 멈춤!
+```
+
+**[예시문제]** 단조성이 f(x)≤x를 의미하는가?
+
+**[풀이]**: 아니다! GEN={d1}, KILL={d2}, x={d2}이면 f(x)={d1}. {d1}과 {d2}는 비교 불가. 단조성은 "입력 간의 관계가 출력에서 보존된다"는 것이지 "출력이 항상 입력보다 작다"가 아님.
+
+#### 4-6. 분배성 — MFP = MOP
+
+```
+분배(distributive): f(x ∧ y) = f(x) ∧ f(y)  (등호!)
+
+  반복 알고리즘: 합치고 적용 = f(x ∧ y)
+  이상적 해(MOP): 적용하고 합치기 = f(x) ∧ f(y)
+
+  분배적 → 둘이 같음 → 정밀도 손실 없음!
+  RD, LV, Available Expr: 분배적 ✓
+  Constant Propagation: 비분배 ✗ (정밀도 손실)
+```
+
+**[예시문제]** 상수 전파가 비분배인 이유를 예시로 보여라.
+
+**[풀이]**:
+```
+  경로 A: x=2, y=3     경로 B: x=3, y=2
+           \               /
+            → z = x + y ←
+
+  적용 후 합치기: f(A)={z=5}, f(B)={z=5} → f(A)∧f(B)={z=5}  ← 상수!
+  합치고 적용:    A∧B={x=NAC,y=NAC} → f(A∧B)={z=NAC}         ← 상수 아님!
+
+  f(A∧B) ≠ f(A)∧f(B) → 비분배!
+  반복 알고리즘은 z=NAC로 판단 (정밀도 손실, but 안전)
+```
+
+#### 4-7. 해의 계층
+
+```
+FP ≤ MFP ≤ MOP ≤ Perfect Solution
+
+  ← 보수적/안전 ─────────── 정밀/이상적 →
+
+  Perfect: 실제 실행 경로만 고려 (계산 불가능!)
+  MOP:     CFG의 모든 가능 경로 고려
+  MFP:     반복 알고리즘의 결과
+  FP:      아무 고정점 해
+
+  분배적 → MFP = MOP (최선!)
+  단조적 → MFP ≤ MOP (안전하지만 정밀도↓ 가능)
+```
+
+#### 4-8. 정확성 — 경로 무시가 위험한 이유
+
+```
+RD에서 경로를 무시하면:
+  정상:  d1:x=  d2:x=          경로 무시: d1:x=   d2:x=
+            \  /                              \  (무시!)
+         u1: =x                            u1: =x
+       RD: {d1,d2} (안전)              RD: {d1} (위험!)
+       격자: 아래쪽 (보수적)            격자: 위쪽 (unsafe!)
+
+  경로 무시 → 격자에서 위로 → 정보 손실 → 잘못된 최적화 가능!
+  반복 알고리즘은 경로를 절대 무시 안 함 → 항상 안전
+```
+
+#### 4-9. 수렴 속도 — Reverse Post-Order
+
+```
+Forward 분석 → rPostOrder로 방문 (≈위상 정렬)
+  정보가 한 패스에 위→아래로 쭉 전파
+
+계산법:
+  ① DFS로 빠져나올 때 번호 부여 (post-order)
+  ② 뒤집기: rPO(i) = 전체노드수 − PostOrder(i)
+
+Backward 분석 → rPostOrder의 역순
+
+실제 프로그램 평균 반복: ~2.75회 (루프 중첩 깊이에 비례)
+```
+
+**[예시문제]** rPostOrder 알고리즘을 아래 CFG에 적용하라.
+```
+entry → A → B → D → exit
+             ↓
+             C → D
+```
+
+**[풀이]**:
+```
+DFS(A에서 시작):
+  Visit A → Visit B → Visit D → Visit exit
+    PostOrder: exit=1, D=2
+  돌아와서 Visit C → Visit D(이미 방문)
+    PostOrder: C=3, B=4, A=5
+
+rPostOrder = 5 − PostOrder:
+  A=0, B=1, C=2, D=3, exit=4
+
+방문 순서: A → B → C → D → exit (위상 정렬과 유사!)
+```
+
 ## ⑤ 시험 대비 체크리스트
 
 ### 계산 문제 유형
@@ -840,13 +1125,16 @@ intersection을 쓰면: "모든 경로에서" → Available Expression에 사용
 - [ ] 스택머신 → RISC 코드 변환 (스택 깊이 추적)
 - [ ] GEN/KILL 테이블 계산 (변수별 정의 위치 → 다른 정의 수집)
 - [ ] RD 반복 계산 (IN/OUT, 수렴까지)
-- [ ] USE/DEF 테이블 계산 (exposed use 판별)
+- [ ] USE/DEF 테이블 계산 (exposed use 판별 — "정의 전 사용" 주의)
 - [ ] LV 반복 계산 (Backward, predecessor 전파)
 - [ ] Local Analysis (BB 내 명령어별 도달 정의)
 - [ ] Strength Reduction + IV Elimination 적용
 - [ ] SSA 변환 (리네이밍 + φ-function)
 - [ ] 간섭 그래프 컬러링 (K개 레지스터)
 - [ ] BB 내 지역 최적화 일괄 적용
+- [ ] 격자 다이어그램 그리기 (∧=∪ vs ∧=∩)
+- [ ] 반순서 관계 판별 (x≤y 여부)
+- [ ] rPostOrder 계산
 
 ### 개념 문제 유형
 - [ ] Forward(RD) vs Backward(LV) 차이
@@ -859,3 +1147,8 @@ intersection을 쓰면: "모든 경로에서" → Available Expression에 사용
 - [ ] Instruction Scheduling이 RA 전후 2번인 이유
 - [ ] LLVM M+N 구조의 장점
 - [ ] 복합 명령어와 컴파일러의 관계
+- [ ] 단조성의 의미와 수렴과의 관계
+- [ ] 분배성과 MFP=MOP의 관계
+- [ ] 상수 전파가 비분배인 이유 (구체 예시)
+- [ ] FP≤MFP≤MOP≤Perfect 해의 계층
+- [ ] rPostOrder가 수렴 속도를 개선하는 이유
