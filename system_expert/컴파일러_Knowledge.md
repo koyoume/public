@@ -104,6 +104,86 @@
 | USE[b] | BB b의 locally exposed uses 집합 |
 | Worklist Algorithm | 변화 노드만 재계산. 고정점까지 수렴 |
 
+### RISC 명령어 레퍼런스 (HP PA-RISC 기반)
+
+수업 예제에서 사용되는 명령어. 표기: `CMD src, dst` (소스 먼저, 목적지 나중).
+
+#### 데이터 이동 (Load / Store / Copy)
+
+| 명령어 | 문법 | 동작 |
+|--------|------|------|
+| LDW | `LDW offset(reg), dst` | 메모리[reg+offset] → dst 레지스터에 로드 (word) |
+| LDWS | `LDWS offset(reg), dst` | 메모리[reg+offset] → dst 레지스터에 로드 (word, short displacement) |
+| LDWS,MA | `LDWS,MA offset(reg), dst` | 메모리[reg] → dst 로드 후, reg += offset (Modify After: 포인터 자동 증가) |
+| LDWX,S | `LDWX,S idx(base), dst` | 메모리[base + idx×4] → dst (인덱스 스케일 로드, ×4 = word 크기) |
+| STW | `STW src, offset(reg)` | src 레지스터 → 메모리[reg+offset]에 저장 (word) |
+| STWS | `STWS src, offset(reg)` | src 레지스터 → 메모리[reg+offset]에 저장 (word, short displacement) |
+| STWM | `STWM src, offset(reg)` | src → 메모리[reg]에 저장 후, reg += offset (Modify: 포인터 자동 증가) |
+| LDI | `LDI imm, dst` | 즉시값(immediate) → dst 레지스터에 로드 |
+| LDO | `LDO offset(reg), dst` | reg + offset → dst (Load Offset: 레지스터+상수 덧셈, 메모리 접근 아님) |
+| COPY | `COPY src, dst` | src 레지스터 → dst 레지스터 복사 |
+
+#### 산술/논리 연산
+
+| 명령어 | 문법 | 동작 |
+|--------|------|------|
+| ADD | `ADD src1, src2, dst` | src1 + src2 → dst |
+| MULTI | `MULTI imm, src, dst` | imm × src → dst (즉시값 곱셈) |
+| SUB | `SUB src1, src2, dst` | src1 − src2 → dst |
+| SUBI | `SUBI imm, src, dst` | imm − src → dst (즉시값에서 뺄셈) |
+| SH2ADD | `SH2ADD src, base, dst` | (src << 2) + base → dst (src×4 + base, 배열 인덱싱용) |
+
+#### 주소 계산 (32비트 상수 로드)
+
+| 명령어 | 문법 | 동작 |
+|--------|------|------|
+| ADDILG | `ADDILG LR'sym, reg, dst` | reg + symbol의 상위 21비트 → dst (Long displacement 상위) |
+| ADDIL | `ADDIL LR'sym, reg, dst` | ADDILG와 동일 (표기 변형) |
+| LDO (하위) | `LDO RR'sym(src), dst` | src + symbol의 하위 11비트 → dst (Long displacement 하위) |
+
+ADDILG + LDO 쌍으로 32비트 전역 주소 획득. SPARC의 `sethi+or`, MIPS의 `lui+ori`에 대응.
+
+#### 분기 / 비교
+
+| 명령어 | 문법 | 동작 |
+|--------|------|------|
+| IF | `IF reg1 < reg2 GOTO label` | reg1 < reg2이면 label로 분기 (의사 명령어) |
+| IFNOT | `IFNOT reg1 < reg2 GOTO label` | 조건 불만족 시 label로 분기 (의사 명령어) |
+| COMB,<= | `COMB,<=,N src1, src2, label` | src1 ≤ src2이면 label로 분기 (Compare and Branch) |
+| COMBF,< | `COMBF,<,N src1, src2, label` | src1 < src2가 **거짓**이면 분기 (Compare and Branch False) |
+| COMIB,<= | `COMIB,<=,N imm, reg, label` | imm ≤ reg이면 label로 분기 (즉시값 비교) |
+| COMIBF,< | `COMIBF,<,N imm, reg, label` | imm < reg가 거짓이면 분기 |
+
+#### 복합 명령어 (Compound Instructions)
+
+| 명령어 | 문법 | 동작 |
+|--------|------|------|
+| ADDIB,< | `ADDIB,< imm, reg, label` | reg += imm → 결과 < 0이면 label로 분기 (증가+비교+분기) |
+| ADDIBF,< | `ADDIBF,< imm, reg, label` | reg += imm → 결과 < 0이 **거짓**이면 분기 |
+| LDWS,MA | `LDWS,MA offset(reg), dst` | 로드 + 포인터 자동 증가 (위 데이터 이동 참조) |
+| STWM | `STWM src, offset(reg)` | 저장 + 포인터 자동 증가 (위 데이터 이동 참조) |
+
+#### 기타
+
+| 명령어 | 문법 | 동작 |
+|--------|------|------|
+| NOP | `NOP` | 아무 동작 안 함 (분기 delay slot 채우기 등에 사용) |
+| LDWCOPY | `LDWCOPY src, dst` | 최적화 표기: load-to-copy 변환 후의 copy (수업 예제 전용) |
+
+#### 특수 레지스터
+
+| 레지스터 | 역할 |
+|----------|------|
+| r0 | 항상 0 (상수 레지스터) |
+| r27 (GP) | Global Pointer — 전역 데이터 영역 기준 주소 |
+| r30 (SP) | Stack Pointer — 스택 영역 기준 주소 |
+| r31 | 범용 (예제에서 임시 레지스터로 사용) |
+| 200+ | 의사 레지스터 (pseudo register, 물리 할당 전) |
+
+#### N 접미사 (Nullification)
+
+`,N` 접미사가 붙은 분기 명령어: 분기가 **실행되지 않을 때** 다음 명령어(delay slot)를 무효화(nullify). 분기가 실행되면 delay slot도 정상 실행. 파이프라인 최적화용.
+
 ## ④ 주제별 상세
 
 ---
