@@ -876,42 +876,75 @@ intersection을 쓰면: "모든 경로에서" → Available Expression에 사용
 
 **[문제]** RD 예제와 같은 CFG에서 USE/DEF 계산 후 LV의 IN/OUT을 구하라.
 
-**[Step 1] USE/DEF 계산** — 한 줄씩 추적:
+**[Step 1] USE/DEF 계산** — BB를 위에서 아래로 읽으며 각 변수의 첫 등장이 읽기인지 쓰기인지 판별:
+
 ```
-B1: d1: i=m-1  → 읽기:m(exposed!) 쓰기:i
-    d2: j=n    → 읽기:n(exposed!) 쓰기:j
-    d3: a=u1   → 읽기:u1(exposed!) 쓰기:a
-    → USE={m,n,u1}, DEF={i,j,a}
+B1:
+  d1: i = m-1
+    오른쪽 m → m의 첫 등장이 읽기 → USE에 m 추가!
+    왼쪽 i  → DEF에 i 추가. i의 첫 등장이 쓰기 → USE에 i 안 넣음.
+  d2: j = n
+    오른쪽 n → 첫 등장 읽기 → USE에 n!  왼쪽 j → DEF에 j.
+  d3: a = u1
+    오른쪽 u1 → 첫 등장 읽기 → USE에 u1!  왼쪽 a → DEF에 a.
+  → USE={m,n,u1}, DEF={i,j,a}
 
-B2: d4: i=i+1  → 읽기:i(exposed! 정의 전 사용) 쓰기:i
-    d5: j=j-1  → 읽기:j(exposed! 정의 전 사용) 쓰기:j
-    → USE={i,j}, DEF={i,j}
-    주의: i=i+1에서 오른쪽 i(읽기)가 왼쪽 i(쓰기)보다 먼저!
+B2:
+  d4: i = i + 1
+    ★ 오른쪽 i(읽기)가 왼쪽 i(쓰기)보다 먼저 실행!
+    i의 첫 등장이 읽기 → USE에 i 추가!  왼쪽 i → DEF에 i.
+  d5: j = j - 1
+    j의 첫 등장이 읽기 → USE에 j 추가!  왼쪽 j → DEF에 j.
+  → USE={i,j}, DEF={i,j}
+  (USE와 DEF에 같은 변수 가능! "정의도 하지만 사용이 먼저")
 
-B3: d6: a=u2   → 읽기:u2(exposed!) 쓰기:a
-    → USE={u2}, DEF={a}
-
-B4: d7: i=u3   → 읽기:u3(exposed!) 쓰기:i
-    → USE={u3}, DEF={i}
+B3: d6: a = u2 → USE={u2}, DEF={a}
+B4: d7: i = u3 → USE={u3}, DEF={i}
 ```
 
-**[Step 2] successor 관계**: B1→B2, B2→{B3,B4}, B3→B2, B4→exit
+**[Step 2]** successor 관계: B1→B2, B2→{B3,B4}, B3→B2(루프백), B4→exit
 
-**[Step 3] 반복 (Backward)** 초기: IN[exit]={}, 모든 IN={}:
+**[Step 3] 반복 (Backward, exit쪽에서 entry쪽으로)** 초기: 모든 IN={}:
+
 ```
-1회차 (뒤에서부터):
-  B4: OUT=IN[exit]={} → IN={u3}∪({}−{i})={u3}                    변화!
-  B3: OUT=IN[B2]={} → IN={u2}∪({}−{a})={u2}                      변화!
-  B2: OUT=IN[B3]∪IN[B4]={u2}∪{u3}={u2,u3}
-      IN={i,j}∪({u2,u3}−{i,j})={i,j,u2,u3}                       변화!
-  B1: OUT=IN[B2]={i,j,u2,u3}
-      IN={m,n,u1}∪({i,j,u2,u3}−{i,j,a})={m,n,u1,u2,u3}           변화!
+── 1회차 ──
 
-2회차 (B2의 IN이 변했으므로 B3 재계산):
-  B3: OUT=IN[B2]={i,j,u2,u3}
-      IN={u2}∪({i,j,u2,u3}−{a})={i,j,u2,u3}                      변화!
-  B2: OUT={i,j,u2,u3}∪{u3}={i,j,u2,u3}
-      IN={i,j}∪({i,j,u2,u3}−{i,j})={i,j,u2,u3}                   변화없음→수렴!
+B4: OUT = IN[exit] = {}
+    IN  = {u3} ∪ ({} − {i}) = {u3}
+    해석: u3만 live. B4에서 i=u3할 때 u3를 읽어야 하니까.           변화!
+
+B3: OUT = IN[B2] = {}  (B2의 IN 아직 {})
+    IN  = {u2} ∪ ({} − {a}) = {u2}
+    해석: u2만 live. B3에서 a=u2할 때 u2를 읽어야 하니까.           변화!
+
+B2: OUT = IN[B3] ∪ IN[B4] = {u2} ∪ {u3} = {u2,u3}
+    IN  = {i,j} ∪ ({u2,u3} − {i,j})
+        = {i,j} ∪ {u2,u3}              ← u2,u3는 DEF={i,j}에 없어서 살아남음
+        = {i,j,u2,u3}
+    해석: i,j는 B2 안에서 사용(USE). u2,u3는 B2를 통과해 전파.       변화!
+
+B1: OUT = IN[B2] = {i,j,u2,u3}
+    IN  = {m,n,u1} ∪ ({i,j,u2,u3} − {i,j,a})
+        = {m,n,u1} ∪ {u2,u3}           ← i,j는 DEF에 있어서 제거됨!
+        = {m,n,u1,u2,u3}
+    해석: m,n,u1은 B1 안에서 사용. u2,u3는 통과 전파. i,j는 B1에서
+          새로 만들므로(i=m-1 등) 진입 시 이전 값 불필요 → 제거.     변화!
+
+── 2회차 (B2의 IN이 변했으므로 B3의 OUT이 영향받음) ──
+
+B3: OUT = IN[B2] = {i,j,u2,u3}         ← 1회차에서는 {}였음!
+    IN  = {u2} ∪ ({i,j,u2,u3} − {a})
+        = {u2} ∪ {i,j,u2,u3}           ← a는 DEF에 있지만 OUT에 없어서 무관
+        = {i,j,u2,u3}
+    해석: u2는 B3에서 사용. i,j,u3는 B3에서 안 건드리므로
+          OUT에서 통과. B2에서 i,j를, B4에서 u3를 쓸 것이므로.       변화!
+
+B2: OUT = IN[B3] ∪ IN[B4] = {i,j,u2,u3} ∪ {u3} = {i,j,u2,u3}  ← 1회차와 동일!
+    IN  = {i,j,u2,u3}                                            변화 없음 ✗
+
+B1: OUT, IN 모두 변화 없음 ✗
+
+── 3회차: B3도 변화 없음 → 수렴! ──
 ```
 
 **[최종 답]**:
@@ -922,7 +955,12 @@ B4: d7: i=u3   → 읽기:u3(exposed!) 쓰기:i
   B4: OUT={}                IN={u3}
 ```
 
-해석: B2에서 i,j가 live → B2 내 i=i+1, j=j-1에서 사용. u2,u3는 B3,B4에서 사용되며 B2를 통과해 전파됨.
+**결과 해석**:
+- B2의 i,j: B2 내 `i=i+1, j=j-1`에서 오른쪽(읽기)에 사용 → live
+- B2의 u2,u3: B2가 안 건드려서 통과. B3(u2), B4(u3)에서 사용 예정
+- B3의 i,j: B3(`a=u2`)에서 사용 안 하지만 OUT에서 통과(DEF={a}에 없음). B2에서 쓸 예정
+- B1의 IN에서 i,j 빠짐: B1에서 `i=m-1, j=n`으로 새로 정의 → 이전 값 불필요
+- B4의 OUT={}: exit 후 아무것도 안 쓰이므로
 
 ---
 
