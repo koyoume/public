@@ -74,6 +74,16 @@
 | Copy Propagation | 사용처를 원본으로 교체 | 항상 가능 | 없음 |
 | Copy Coalescing | 소스/타겟 LR 합쳐 같은 레지스터 | LR이 간섭 안 해야 함 | 간선 증가→컬러링 어려움 |
 
+### Register Allocation: Chaitin vs Briggs 비교
+
+| 항목 | Chaitin (1982) | Briggs (Optimistic) |
+|------|----------------|---------------------|
+| Simplify시 degree>=n 처리 | 즉시 spill 후보 결정 + 제거 | 일단 스택에 push (미확정) |
+| Spill 결정 시점 | Simplify 단계 | Select 단계 |
+| Spill 후 동작 | load/store 삽입 → 처음부터 재시작 | 색 배정 불가 시에만 spill → 재시작 |
+| 불필요한 spill | 발생 가능 | 제거 (Chaitin spill 노드의 부분집합만 spill) |
+| 컬러링 능력 | 기본 | Chaitin이 칠하는 모든 그래프 + 추가 그래프 |
+
 ### 데이터 흐름 분석 프레임워크 성질 비교
 
 | 분석 | meet(∧) | 방향 | 단조? | 분배? | MFP vs MOP |
@@ -522,6 +532,20 @@ Available Expression 조건:
 변환:
   store → copy
   load  → 삭제 (이미 레지스터에 있음)
+
+Aliasing 문제 (Register Promotion의 최대 장벽):
+  포인터를 통한 간접 접근이 있으면, 해당 포인터가
+  promotion 대상 변수를 가리킬 가능성을 배제할 수 없음
+  → 보수적으로 매번 메모리에서 읽어야 함
+
+  예시:
+    int g;  int *p;
+    for (...) {
+        sum += g;    ← g를 레지스터에 캐시하고 싶지만
+        *p = i;      ← p가 &g를 가리키면 g가 변함!
+    }
+    → 컴파일러는 p→g aliasing을 배제 못함 → g promotion 불가
+    → sum, i는 지역변수(주소 미노출) → promotion 가능
 ```
 
 **[예시문제]** 다음 중 Register Promotion 가능한 것은?
@@ -531,6 +555,7 @@ Available Expression 조건:
 | 1 | `STW r5, SP-16; LDW SP-16, r8` | O | singleton 지역변수 |
 | 2 | `STW r5, 0(r3)` (r3=포인터) | X | 포인터 — 주소 가변 |
 | 3 | `STW r5, GP+arr+r2*4` | X | 배열 — 인덱스 가변 |
+| 4 | 전역변수 g + 함수 내 `*p = val` 존재 | X | aliasing — p가 &g 가리킬 가능성 |
 
 #### 2-6. 루프 최적화: LICM + Strength Reduction + IV Elimination
 
@@ -580,6 +605,48 @@ Interference Graph:
 
 Spilling: 레지스터 부족 → web을 스택으로
   def 직후 store 추가, use 직전 load 추가
+  Spill cost = c × 10^d
+    c = 타겟 머신의 load/store 비용
+    d = 루프 중첩 깊이 (loop nesting depth)
+    → 루프 깊은 곳의 변수는 spill 비용 기하급수적 → spill 회피
+```
+
+**Chaitin의 6단계 (1982):**
+```
+  renumber → build → coalesce → spill cost → simplify → select
+       ↑                                              |
+       └──────── spill code (spill 발생 시) ←─────────┘
+
+  1. Renumber: live range 이름 재부여
+  2. Build: 간섭 그래프 구축
+  3. Coalesce: copy 관련 노드 중 간섭 없는 쌍 합치기 (aggressive)
+  4. Spill cost: c × 10^d 계산
+  5. Simplify: degree < n인 노드 → 스택 push
+               degree >= n → 최저 cost/benefit 노드를 spill 후보로 결정+제거
+  6. Select: 스택에서 pop하며 색 배정
+     → spill 후보가 있었으면 load/store 삽입 후 1번부터 재시작
+```
+
+**Briggs의 Optimistic Coloring:**
+```
+  Chaitin과 차이점:
+    Simplify: degree >= n 노드도 "일단 스택에 push" (spill 확정하지 않음)
+    Select:  스택에서 pop할 때 이웃들이 이미 제거되어
+             실제 색칠 가능할 수 있음 → 가능하면 색 배정
+             불가능할 때만 비로소 spill 결정
+
+  이점:
+    - Chaitin이 spill하는 노드 중 일부를 spill 없이 색칠 가능
+    - 불필요한 spill (unproductive spill) 제거
+    - spill 필요 시에도 Chaitin이 spill할 노드의 부분집합만 spill
+```
+
+**Live Range Splitting:**
+```
+  컬러링 실패 시 전체 live range를 spill하는 대신
+  live range를 부분으로 분할 → 일부만 spill, 나머지 레지스터 유지
+  → 간섭 그래프가 단순해져서 컬러링 가능성 증가
+  LLVM: greedy register allocator + aggressive live range splitting 사용
 ```
 
 **[예시문제]** 3개 물리 레지스터(R1,R2,R3)로 아래 간섭 그래프를 컬러링하라.
@@ -591,6 +658,15 @@ c    d
 ```
 
 **[풀이]**: a-b 간섭, a-c 간섭, b-c 간섭, b-d 간섭. a→R1, b→R2, c→R3, d→R1(또는 R3). a-d 간섭 없으므로 같은 색 가능. 4개 web을 3색으로 배정 가능 → spilling 불필요.
+
+**[예시문제]** 위 그래프에서 레지스터가 2개뿐이라면? Chaitin과 Briggs 각각의 동작을 비교하라.
+```
+n=2. 모든 노드의 degree >= 2인 경우:
+Chaitin: degree < 2인 노드 없음 → d(degree=1)부터 spill 후보 결정
+         → d 제거 후 a,b,c 중 degree < 2가 나타나는지 반복
+Briggs:  d를 일단 스택에 push → 나머지에서 degree < 2 발생 가능
+         → select 시 d의 이웃 중 이미 같은 색이 아닌 경우 색칠 성공 가능
+```
 
 #### 2-8. Copy Elimination
 
@@ -651,6 +727,80 @@ SSA 변환:
   ↓ (7) RA + Copy Elim: COPY propagation/coalescing → 삭제
 [최종]  루프 4개 명령어:
   ADD 65,69,68 / STWS 0,0(68) / LDO 100(69),69 / IF 69<71 GOTO
+```
+
+---
+
+### Ch5. Global Common Subexpression Elimination
+
+#### 5-1. Available Expression Analysis
+
+```
+정의: 표현식 x+y가 지점 p에서 available하다
+  ⟺ p까지의 모든 경로에서
+     ① x+y가 최소 한 번 계산되었고
+     ② 마지막 계산 이후 x나 y가 재정의되지 않음
+
+분석 특성:
+  방향: Forward
+  합류 연산자: ∩ (intersection) — must 분석
+    → 한 경로에서라도 available 아니면 전체 불가
+  초기값: IN[entry] = {} (아무것도 available 아님)
+          IN[나머지] = U (전체 표현식, optimistic)
+  전달함수: OUT[b] = GEN[b] ∪ (IN[b] - KILL[b])
+    GEN[b] = b에서 계산되고 이후 피연산자 재정의 없는 표현식
+    KILL[b] = b에서 재정의되는 변수를 포함하는 모든 표현식
+```
+
+**CSE 제거 절차:**
+```
+  1. Available Expression 분석으로 각 BB 입구의 available set 확보
+  2. BB 내부에서 value numbering (available로 초기화)
+  3. 이미 available한 표현식이 다시 나오면 → 이전 계산 결과 재사용
+     (같은 RHS → 같은 타겟 레지스터 가정)
+```
+
+**[예시문제]** 아래 CFG에서 B4 입구의 available expressions를 구하라.
+```
+    [B1] t1 = a+b
+    /         \
+  [B2]       [B3]
+  a = 3     t2 = a+b
+    \         /
+     [B4] t3 = a+b
+```
+
+**[풀이]**: B2 경로: B1에서 a+b 계산 → B2에서 a 재정의 → a+b 무효화. B3 경로: B1, B3 모두에서 a+b 계산, 재정의 없음 → available. 합류: available(B2경로) ∩ available(B3경로) = {} ∩ {a+b} = {}. B4 입구에서 a+b는 **available하지 않음**.
+
+#### 5-2. Partial Redundancy Elimination (PRE)
+
+```
+PRE = 부분적으로 중복인 계산을 완전히 중복으로 만들어 제거
+
+일부 경로에서만 available → 그 경로에 계산을 삽입
+→ 모든 경로에서 available로 만든 뒤 CSE로 제거
+
+주의: 아무 곳에나 삽입하면 오류 발생
+  예: if (a>0) { b=1; d=b+c; } e=b+c;
+  잘못: if문 앞에 t=b+c 삽입 → a<=0일 때 b 미정의 상태에서 계산!
+```
+
+#### 5-3. Anticipation Analysis
+
+```
+정의: 표현식 E가 지점 P에서 anticipated(예상)된다
+  ⟺ P에서 시작하는 모든 실행 경로에서
+     같은 값을 계산하는 E가 반드시 나타남
+
+용도: PRE에서 "E를 P에 삽입해도 되는가?"의 필요 조건
+  (anticipated해야만 삽입 후보, 단 충분 조건은 아님)
+
+분석 특성:
+  방향: Backward (미래 경로에서 나타나는지 확인)
+  합류 연산자: ∩ (intersection) — 모든 경로에서 나타나야 함
+  전달함수:
+    w = x + y  → x+y를 GEN (블록이 x+y를 계산함)
+    x = x + y  → x+y를 KILL (피연산자 x 재정의로 이전 값 무효)
 ```
 
 ---
