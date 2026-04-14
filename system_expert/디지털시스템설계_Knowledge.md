@@ -19,6 +19,11 @@
 | **[Ch1] Mux** | Y = D₀·S̅ + D₁·S | 2:1 Mux 수식 |
 | **[Ch1] FSM next state (예)** | S'₁ = S₁ ⊕ S₀ | Traffic Light Controller |
 | **[Ch1] FSM next state (예)** | S'₀ = S̅₁·S̅₀·T̅_A + S₁·S̅₀·T̅_B | |
+| **[Ch3] 4-bit Adder** | {c_out, sum} = x + y + c_in | concatenation으로 5비트 결과 분리 |
+| **[Ch3] Adder/Subtractor** | t = y ^ {4{c_in}}; {c_out,sum} = x + t + c_in | c_in=0→덧셈, c_in=1→뺄셈(2의 보수) |
+| **[Ch3] Even Parity** | ep = ^x | XOR reduction, 모든 비트 XOR |
+| **[Ch3] All-Zero** | zero = ~(\|x) | OR reduction 후 NOT |
+| **[Ch3] All-One** | one = &x | AND reduction |
 
 ---
 
@@ -37,6 +42,12 @@
 | **Continuous vs Procedural Assignment [Ch2]** | assign으로 wire 구동, 항상 활성 | always 블록 내에서 reg에 할당 |
 | **Synthesizable vs Non-synthesizable [Ch2]** | module, always, assign, wire, reg | initial, #delay, $display, $monitor, $finish |
 | **Moore's Law vs Dennard Scaling [Ch0]** | 트랜지스터 수 ~2배/18-24개월 (둔화 중) | 전력밀도 일정 (이미 종료) |
+| **Inertial vs Transport delay [Ch3]** | continuous assign 기본, 짧은 펄스 무시 | net delay 기본, 모든 변화 전파 |
+| **Logical vs Case equality [Ch3]** | == : x/z 있으면 결과 x | === : x/z까지 정확 비교 (합성 불가) |
+| **Logical vs Arithmetic shift [Ch3]** | <<,>> : 빈 자리 항상 0 | <<<,>>> : 산술 우시프트만 부호비트 패딩 |
+| **Logical vs Bitwise operator [Ch3]** | !,&&,\|\| : 전체→1비트 true/false | ~,&,\|,^ : 비트별 연산 |
+| **Reduction vs Bitwise [Ch3]** | 단항, 벡터→스칼라 (&x, \|x, ^x) | 이항, 비트별 연산 (a&b, a\|b) |
+| **signed vs unsigned 비교 [Ch3]** | 둘 다 signed→sign extension+signed 비교 | 한쪽이라도 unsigned→zero-pad+unsigned 비교 |
 
 ---
 
@@ -88,6 +99,23 @@
 | wire | Verilog net 타입, 하드웨어 연결점, 값 저장 불가 [Ch2] |
 | X (unknown) | 알 수 없는 논리 값, 시뮬레이터 초기화 전 상태 [Ch1,Ch2] |
 | Z (high-impedance) | 구동되지 않는 floating 상태 [Ch1,Ch2] |
+| Array | 같은 속성 객체의 모음, 한 번에 하나의 요소만 접근 가능 [Ch3] |
+| Arithmetic shift | <<<, >>>; 우시프트 시 부호비트로 패딩, 좌시프트는 0 패딩 [Ch3] |
+| Bitwise operator | ~, &, \|, ^, ~^; 비트별 연산, z는 x로 취급 [Ch3] |
+| Case equality | ===, !==; x/z까지 정확 비교, 합성 불가 [Ch3] |
+| Concatenation | {a, b}; 비트를 이어붙이는 연산, 피연산자 반드시 sized [Ch3] |
+| Conditional operator | cond ? true_expr : false_expr; Mux/tri-state 모델링 [Ch3] |
+| Continuous assignment | assign으로 net 구동, 항상 활성, 조합논리 모델링 [Ch3] |
+| Inertial delay | 게이트 RC 모델, continuous assign 기본, 짧은 펄스 무시 [Ch3] |
+| integer | signed reg로 취급, 최소 32비트, 초기값 x [Ch3] |
+| Logical operator | !, &&, \|\|; 전체 피연산자를 true/false로 평가하여 1비트 결과 [Ch3] |
+| Logical shift | <<, >>; 빈 자리 항상 0으로 패딩 [Ch3] |
+| Memory | ROM/RAM/register file 모델링, reg 배열로 구현 [Ch3] |
+| Part-select (variable) | [base+:width], [base-:width]; width는 상수, base는 변수 가능 [Ch3] |
+| Reduction operator | 단항 &, \|, ^; 벡터를 스칼라로 축소 [Ch3] |
+| Replication | {n{expr}}; 반복 concatenation [Ch3] |
+| Transport delay | 와이어 지연 모델, net delay 기본, 모든 변화 전파 [Ch3] |
+| Vector | 다중 비트 신호 묶음(bus), [msb:lsb] 또는 [lsb:msb] 선언 [Ch3] |
 
 ---
 
@@ -338,6 +366,135 @@ always #5 clk = ~clk;       // 주기 10ns 클럭 생성
 
 ---
 
+### [Ch3] Dataflow Modeling
+
+**Continuous Assignment 규칙:**
+- LHS는 반드시 net(wire)의 scalar/vector/concatenation. 절대 reg 아님!
+- RHS에는 reg, function call 등 사용 가능
+- 항상 활성(Always Active): RHS 변하면 즉시 LHS 갱신
+- net은 한 번만 선언, 여러 assign은 가능하지만 비추천
+
+```verilog
+wire out;
+assign out = in1 & in2;     // regular (추천)
+wire out = in1 & in2;       // implicit (OK)
+assign out = in1 & in2;     // implicit net decl (비추천)
+```
+
+**Delay 모델:**
+
+```
+  Inertial delay: assign #10 out = in1 & in2;
+    → 짧은 펄스(< delay) 무시, 게이트 RC 모델
+  Transport delay: wire #10 out; assign out = in1 & in2;
+    → 모든 변화 전파, 와이어 지연 모델
+```
+
+**Signed/Unsigned 상수 — 시험 함정:**
+
+```
+ 4'sb1001  → 비트 1001 → signed → -7
+ 5'sb1001  → 비트 01001 → signed → +9
+ 4'shf     → 비트 1111 → signed → -1
+ 4'hf      → 비트 1111 → unsigned → 15
+ 4'sd12    → 비트 1100 → signed → -4 (12=1100)
+ 5'sd12    → 비트 01100 → signed → +12
+ -4'sb0010 → -(2) → 비트 1110
+
+ 원칙: 's'는 비트패턴 안 바꿈, 해석만 바꿈
+```
+
+**Signed/Unsigned 비교 함정:**
+
+```verilog
+wire signed [3:0] a = -4'd4;   // 1100, signed→-4
+wire unsigned [3:0] b = 4'd5;  // 0101, unsigned→5
+(a > b) → 1 (true!)  // b가 unsigned → 모두 unsigned로 비교
+                       // 1100=12 > 0101=5 → true
+```
+
+**Equality (== vs ===):**
+
+```verilog
+4'b1x0z == 4'b1x0z   → x  (x/z 포함 → 결과 x)
+4'b1x0z === 4'b1x0z  → 1  (x/z까지 정확 비교, 합성불가)
+```
+
+**등호 비교 시 sign extension:**
+
+```verilog
+wire signed [5:0] a = -6'd4;  // 111100
+wire signed [3:0] b = -4'd4;  // 1100 → sign ext → 111100
+(a == b) → 1
+```
+
+**연산자 총정리 코드 예제:**
+
+```verilog
+// 4-bit Adder
+assign {c_out, sum} = x + y + c_in;
+
+// 4-bit Adder/Subtractor
+assign t = y ^ {4{c_in}};           // c_in=1→~y
+assign {c_out, sum} = x + t + c_in; // c_in=1→x-y
+
+// Parity Generator (reduction XOR)
+assign ep = ^x;         // even parity
+assign op = ~ep;        // odd parity
+
+// All-Zero / All-One Detector
+assign zero = ~(|x);    // OR reduction → NOT
+assign one  = &x;       // AND reduction
+
+// 4:1 Mux (conditional 중첩)
+assign out = s1 ? (s0 ? i3 : i2) : (s0 ? i1 : i0);
+```
+
+**Shift 연산:**
+
+```
+ Logical >>1:  10101010 → 01010101 (0 패딩)
+ Arith   >>>1: 10101010 → 11010101 (부호비트 1 패딩, -86→-43)
+ Logical <<1:  10101010 → 01010100 (0 패딩)
+ Arith   <<<1: 10101010 → 01010100 (0 패딩, 부호 비보존!)
+```
+
+**Bitwise x/z 진리표:**
+
+```
+  &  │ 0  1  x        |  │ 0  1  x
+  ───┼─────────        ───┼─────────
+  0  │ 0  0  0        0  │ 0  1  x
+  1  │ 0  1  x        1  │ 1  1  1
+  x  │ 0  x  x        x  │ x  1  x
+  (z는 x로 취급)
+```
+
+**Variable Data Types 초기값:**
+
+```
+  reg, integer, time → 초기값 x
+  real, realtime     → 초기값 0.0
+```
+
+**Vector endianness:**
+
+```verilog
+reg [7:0] a = 14;   // a[3:0]=1110 ✓
+reg [0:7] b = 14;   // b[0:3]=0000, b[3:0]은 불법!
+```
+
+**Variable part-select:**
+
+```verilog
+wire [15:0] v;
+v[8+:8]  // = v[15:8]  (base=8, 위로 8비트)
+v[7-:8]  // = v[7:0]   (base=7, 아래로 8비트)
+// width는 상수, base는 변수 가능
+```
+
+---
+
 ## ⑤ 시험 대비 체크리스트
 
 ### 계산 문제 유형
@@ -346,6 +503,10 @@ always #5 clk = ~clk;       // 주기 10ns 클럭 생성
 - [ ] FSM 설계: state diagram → encoding → next state/output equations
 - [ ] Boolean Algebra 정리 적용하여 수식 간소화
 - [ ] Verilog 숫자 표현 해석 (크기 불일치, 음수, x/z 패딩)
+- [ ] Signed/unsigned 상수 해석 ('s' 지정자, sign extension, truncation) [Ch3]
+- [ ] Signed/unsigned 비교 결과 판별 (mixed operand 시 unsigned로 비교) [Ch3]
+- [ ] Reduction operator 결과 계산 (^x, &x, |x) [Ch3]
+- [ ] Shift 연산 결과 (logical vs arithmetic, 부호비트 처리) [Ch3]
 
 ### 개념 문제 유형
 - [ ] wire vs reg 차이, 언제 어떤 것을 사용하는가
@@ -357,3 +518,10 @@ always #5 clk = ~clk;       // 주기 10ns 클럭 생성
 - [ ] Synthesizable vs Non-synthesizable 구분
 - [ ] De Morgan's theorem과 Logical completeness
 - [ ] Dennard Scaling이 끝난 이유와 그 결과
+- [ ] Continuous assignment 규칙 (LHS=net만, Always Active) [Ch3]
+- [ ] Inertial vs Transport delay 차이 [Ch3]
+- [ ] Logical vs Case equality (== vs ===) [Ch3]
+- [ ] Logical vs Bitwise vs Reduction operator 구분 [Ch3]
+- [ ] Concatenation/Replication으로 adder/subtractor 구현 원리 [Ch3]
+- [ ] Vector endianness, variable part-select 문법 [Ch3]
+- [ ] Array/Memory 접근 제약 (단일 word만 할당 가능) [Ch3]
