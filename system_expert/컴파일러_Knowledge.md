@@ -1,6 +1,6 @@
 # 컴파일러 Knowledge
 
-> 삼성DS 시스템 전문가 과정 — 컴파일러 (문수묵 교수) | 마지막 업데이트: Ch1~4
+> 삼성DS 시스템 전문가 과정 — 컴파일러 (문수묵 교수) | 마지막 업데이트: Ch1~6
 
 ---
 
@@ -1355,37 +1355,91 @@ Ch4는 "분석 도구의 품질 보증서"
   Constant Propagation (비분배) → 상수 접기/전파 (반복으로 한계 → SSA 기반 보완)
 ```
 
+---
+
+### Ch6. Control Flow Analysis and Loops
+
+#### 6-1. 루프의 정의
+
+```
+루프의 두 조건:
+  ① 단일 진입점 (header): 외부에서 들어오는 입구 1개
+  ② 사이클: 간선들이 최소 1개 사이클 형성
+
+모든 사이클 ≠ 루프. 진입점 2개 이상이면 최적화용 루프 아님.
+```
+
+#### 6-2. Dominator
+
+```
+d dom n: start에서 n으로 가는 모든 경로가 d를 통과
+
+데이터 흐름 분석으로 계산:
+  방향: Forward, ∧=∩, 전달함수: OUT[b]=IN[b]∪{b}
+  경계: IN[entry]={}, 초기화: OUT[b]=U(전체)
+  분배적 → MFP=MOP
+```
+
+**[예시문제]** 노드 7의 dominator (pred={5,6}, OUT[5]={1,2,3,5}, OUT[6]={1,2,4,6}):
+
+**[풀이]**: IN[7]={1,2,3,5}∩{1,2,4,6}={1,2}. OUT[7]={1,2}∪{7}={1,2,7}
+
+#### 6-3. Back Edge와 Natural Loop
+
+```
+Back edge: t→h에서 h dom t ("h가 t를 dominate")
+  DFS 간선 분류: Advancing(조상→자손), Retreating(자손→조상), Cross(좌→우)
+  back edge ⊆ retreating edge
+  Reducible flow graph: retreating = back (구조적 코드)
+
+Natural loop of t→h:
+  1. h 제거 → 2. t에서 역방향 도달 가능 노드 → 3. 그 노드들+h = loop
+
+Inner loop = 다른 루프 미포함. 최적화 주 대상.
+Preheader = 루프 헤더 앞 새 BB. LICM 코드 삽입점.
+```
+
+**[예시문제]** 8→7이 back edge인지: 7 dom 8? 8의 dom={1,2,7,8}, 7∈dom → YES!
+
 ## ⑤ 시험 대비 체크리스트
 
 ### 계산 문제 유형
 - [ ] 실행 시간 계산 (IC × CPI × CT) 및 Speedup
-- [ ] 스택머신 → RISC 코드 변환 (스택 깊이 추적)
-- [ ] GEN/KILL 테이블 계산 (변수별 정의 위치 → 다른 정의 수집)
+- [ ] 스택머신 → RISC 코드 변환
+- [ ] GEN/KILL 테이블 계산 (RD)
 - [ ] RD 반복 계산 (IN/OUT, 수렴까지)
-- [ ] USE/DEF 테이블 계산 (exposed use 판별 — "정의 전 사용" 주의)
-- [ ] LV 반복 계산 (Backward, predecessor 전파)
-- [ ] Local Analysis (BB 내 명령어별 도달 정의)
-- [ ] Strength Reduction + IV Elimination 적용
-- [ ] SSA 변환 (리네이밍 + φ-function)
-- [ ] 간섭 그래프 컬러링 (K개 레지스터)
-- [ ] BB 내 지역 최적화 일괄 적용
-- [ ] 격자 다이어그램 그리기 (∧=∪ vs ∧=∩)
-- [ ] 반순서 관계 판별 (x≤y 여부)
+- [ ] USE/DEF 테이블 계산 (LV)
+- [ ] LV 반복 계산 (Backward)
+- [ ] AE의 GEN/KILL 계산 ("x=x+y" 주의)
+- [ ] AE 반복 계산 (∩, 초기 OUT=U)
+- [ ] Dominator 계산 (∩, OUT[b]=IN[b]∪{b})
+- [ ] Back edge 판별 (h dom t?)
+- [ ] Natural loop 구성
+- [ ] Strength Reduction + IV Elimination
+- [ ] SSA 변환 + φ-function
+- [ ] 간섭 그래프 컬러링
+- [ ] BB 내 지역 최적화 적용
+- [ ] 격자 다이어그램 그리기
 - [ ] rPostOrder 계산
+- [ ] Anticipated Expression 판별
+- [ ] PRE 삽입 가능 여부 판별
 
 ### 개념 문제 유형
-- [ ] Forward(RD) vs Backward(LV) 차이
+- [ ] Forward vs Backward 분석 차이
 - [ ] KILL의 정적 속성 의미
-- [ ] union vs intersection 선택 이유 (보수적 근사)
-- [ ] FE/ME/BE 역할 구분
+- [ ] union vs intersection 선택 이유
+- [ ] 경계 조건 vs 초기화 차이 (IN[entry] vs OUT[b])
 - [ ] SSA 장점과 φ-function 역할
 - [ ] Register Promotion 조건 (singleton)
-- [ ] Copy Propagation vs Coalescing 트레이드오프
-- [ ] Instruction Scheduling이 RA 전후 2번인 이유
-- [ ] LLVM M+N 구조의 장점
-- [ ] 복합 명령어와 컴파일러의 관계
-- [ ] 단조성의 의미와 수렴과의 관계
+- [ ] Copy Propagation vs Coalescing
+- [ ] 단조성과 수렴의 관계
 - [ ] 분배성과 MFP=MOP의 관계
-- [ ] 상수 전파가 비분배인 이유 (구체 예시)
-- [ ] FP≤MFP≤MOP≤Perfect 해의 계층
-- [ ] rPostOrder가 수렴 속도를 개선하는 이유
+- [ ] 상수 전파 비분배 예시
+- [ ] RD(∪)와 AE(∩) 초기화 차이 이유
+- [ ] Available vs Anticipated 차이
+- [ ] PRE unsafe 삽입 식별
+- [ ] Dominator의 정의와 루프 탐지 역할
+- [ ] Back edge vs Retreating edge
+- [ ] Reducible flow graph 정의
+- [ ] Preheader의 역할 (LICM 연결)
+- [ ] Inner loop과 최적화 우선순위
