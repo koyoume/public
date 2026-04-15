@@ -1,7 +1,7 @@
 # 컴퓨터구조 Knowledge
 
 > 삼성DS · COD (Computer Organization & Design) RISC-V
-> 최종 업데이트: 2026-04-15 · Ch1~Ch2
+> 최종 업데이트: 2026-04-15 · Ch1~Ch3
 
 ---
 
@@ -26,6 +26,9 @@
 | `Byte offset = index × 8` | doubleword 배열 주소 | A[i] → offset = i×8 | |
 | `TCO = CAPEX + OPEX` | 총 소유 비용 | CAPEX=초기 투자, OPEX=운영 비용 | perf/TCO로 실질 가성비 평가 |
 | `perf/TCO` | TCO 단위당 성능 | perf=성능(throughput 등), TCO=총 소유 비용 | 높을수록 가성비 좋음 |
+| `FP값 = (-1)^S × (1+Frac) × 2^(Exp-Bias)` | IEEE 754 부동소수점 값 | S=부호, Frac=소수부, Exp=지수, Bias=127(single)/1023(double) | 정규화 기준, hidden bit=1 |
+| `Single range: ±1.2×10⁻³⁸ ~ ±3.4×10³⁸` | 단정밀도 범위 | 정밀도 ~6자리 십진수 (2⁻²³) | Exp 8bit, Frac 23bit |
+| `Double range: ±2.2×10⁻³⁰⁸ ~ ±1.8×10³⁰⁸` | 배정밀도 범위 | 정밀도 ~16자리 십진수 (2⁻⁵²) | Exp 11bit, Frac 52bit |
 
 ---
 
@@ -48,6 +51,11 @@
 | Array vs Pointer | 매번 index×size+base | 주소 직접 증가 | 컴파일러가 동일 최적화 가능→배열 권장 |
 | PC-relative vs Absolute | PC+offset(분기) | 전체주소(lui+jalr) | PC-relative: 위치독립, 짧은 인코딩 |
 | CAPEX vs OPEX | 초기 투자비(서버·장비 구매) | 운영비(전력·냉각·인건비·유지보수) | TCO=CAPEX+OPEX. 데이터센터에서 OPEX(특히 전력)가 TCO의 상당 부분 차지 |
+| Single vs Double precision | 32-bit(S1+Exp8+Frac23), Bias=127 | 64-bit(S1+Exp11+Frac52), Bias=1023 | Single:~6자리/Double:~16자리 십진. 범위와 정밀도 트레이드오프 |
+| FP 덧셈 vs FP 곱셈 | 지수 정렬→가수 덧셈→정규화→반올림 | 지수 덧셈→가수 곱셈→정규화→반올림→부호결정 | 덧셈: 지수 맞춤이 핵심. 곱셈: 지수끼리 더하고 가수끼리 곱함 |
+| Restoring vs Non-restoring div | 음수 나머지 시 divisor 다시 더함 | 다음 단계에서 보정 | Restoring이 더 단순, Non-restoring이 더 빠름 |
+| Guard/Round/Sticky bits | 추가 정밀도 비트 | | 정확한 반올림을 위한 IEEE 754 메커니즘 |
+| Integer regs vs FP regs | x0~x31 (32×64-bit) | f0~f31 (32×64-bit) | 별도 레지스터 파일. FP 명령어는 FP 레지스터만 사용 |
 
 ---
 
@@ -64,21 +72,28 @@
 | CISC | 복잡·다양·가변길이 명령어. x86 대표 |
 | CPI | 명령어당 평균 클럭 사이클. CPU HW와 명령어 mix에 의해 결정 |
 | Datapath | 프로세서 내부 데이터 연산 유닛 (ALU, 레지스터) |
+| Denormal Number | Exponent=0일 때 hidden bit=0. 정규화 수보다 더 작은 값 표현. Gradual underflow 허용 |
 | Control | 명령어 해석(decode) → Datapath에 제어 신호 |
 | Design Principle 1 | Simplicity favors regularity |
 | Design Principle 2 | Smaller is faster |
 | Design Principle 3 | Good design demands good compromises |
 | Dynamic Linking | 호출 시점에만 라이브러리 로드. Lazy Linkage |
 | IC (Instruction Count) | 프로그램 실행 시 총 명령어 수 |
+| IEEE 754 | 부동소수점 표현 및 연산의 국제 표준. Single(32-bit), Double(64-bit). Bias, hidden bit, 특수값(±0, ±Inf, NaN, Denormal) 정의 |
+| Infinity (±∞) | Exp=111...1, Frac=000...0. 오버플로우 시 사용. 후속 계산에 전파 가능 |
 | ISA | HW/SW 인터페이스. 프로세서가 이해하는 명령어 집합 정의 |
 | Little Endian | 최하위 바이트가 가장 낮은 주소. RISC-V 사용 |
 | lr.d / sc.d | Load Reserved / Store Conditional. 동기화용 atomic 쌍 |
 | lui | 20-bit 상수를 rd[31:12]에 로드, sign extend, [11:0]=0 |
 | Moore's Law | IC 트랜지스터 수 약 2년마다 2배. 경험적 관찰(물리법칙 아님) |
+| NaN (Not a Number) | Exp=111...1, Frac≠0. 0/0 등 정의되지 않은 결과. 후속 계산에 전파 |
 | OPEX (Operating Expenditure) | 운영 지출. 전력·냉각·인건비·유지보수·네트워크 등 지속적 비용. 데이터센터에서 전력이 OPEX의 핵심 |
+| Overflow | 연산 결과가 표현 가능 범위 초과. 정수: 부호 반전으로 감지. FP: Infinity로 처리 |
 | Power Wall | 전압/발열 한계로 클럭 향상 불가 → 멀티코어 전환 |
 | R/I/S/SB/U/UJ-type | RISC-V 6가지 32-bit 고정길이 명령어 포맷 |
 | RISC-V | UC Berkeley 개발 오픈 RISC ISA. 이 과목 기준 ISA |
+| Saturating Operation | 오버플로우 시 wrap-around 대신 최대/최소값으로 고정. 오디오/비디오 처리에 사용 |
+| SIMD | Single Instruction Multiple Data. 하나의 명령어로 여러 데이터를 동시 처리. SSE/AVX가 대표적 |
 | Sign Extension | 넓은 비트 확장 시 부호비트 복제. lb(sign), lbu(zero) |
 | SPEC | Standard Performance Evaluation Corp. 기하평균 벤치마크 |
 | Stored Program | 명령어도 이진수로 메모리 저장. 프로그램이 프로그램 조작 가능 |
@@ -143,6 +158,19 @@ perf/TCO ↑ 전략:
 
 **Factorial 예시**: sp-=16, sd x1/x10, base→return 1, recursive→jal fact, mul x10,x10,x6
 
+### Chapter 3: Arithmetic for Computers
+
+(이전 채팅에서 상세 정리 완료 — 52 slides 전체 반영)
+
+핵심 토픽: 정수 덧셈/뺄셈 오버플로우 조건, 곱셈 하드웨어(long multiplication, optimized, faster multiplier), 나눗셈(restoring division, SRT), RISC-V mul/mulh/div/rem 명령어, IEEE 754 부동소수점(Single/Double, Bias, hidden bit, Denormal, ±Inf, NaN), FP 덧셈 4단계(정렬→덧셈→정규화→반올림), FP 곱셈 5단계(지수 덧셈→가수 곱셈→정규화→반올림→부호), FP Adder HW(4-stage pipeline), RISC-V FP 레지스터(f0~f31) 및 명령어(fadd.d/fmul.d/fld/fsd/feq.d 등), Guard/Round/Sticky bits, SIMD/Subword Parallelism, SSE2/AVX, Saturating operation, FP Associativity 불성립
+
+**FP 변환 예시**: -0.75 = (-1)¹ × 1.1₂ × 2⁻¹ → S=1, Frac=100...0, Exp=-1+127=126=01111110₂
+
+**오버플로우 조건**: 양수+양수→결과 음수, 음수+음수→결과 양수이면 overflow. 부호가 다른 피연산자끼리는 overflow 불가
+
+**FP 덧셈**: Step1 지수정렬 → Step2 가수덧셈 → Step3 정규화 → Step4 반올림
+**FP 곱셈**: Step1 지수덧셈 → Step2 가수곱셈 → Step3 정규화 → Step4 반올림 → Step5 부호결정
+
 ---
 
 ## ⑤ 시험 대비 체크리스트
@@ -182,3 +210,25 @@ perf/TCO ↑ 전략:
 - [ ] Stored Program Concept
 - [ ] Little Endian
 - [ ] lb vs lbu, blt vs bltu
+### Ch3 계산
+- [ ] 십진/이진 수를 IEEE 754 single/double로 변환 (S, Exp, Frac)
+- [ ] IEEE 754 비트 패턴을 십진수로 역변환
+- [ ] FP 덧셈 4단계 수동 계산 (정렬→덧셈→정규화→반올림)
+- [ ] FP 곱셈 5단계 수동 계산
+- [ ] 정수 오버플로우 판별 (부호 조합별)
+- [ ] 이진 long multiplication 수동 계산
+- [ ] mulh로 64-bit 오버플로우 검출 방법
+
+### Ch3 개념
+- [ ] IEEE 754 포맷: S, Exponent, Fraction, Bias, hidden bit
+- [ ] Single vs Double 범위/정밀도 차이
+- [ ] Denormal, ±Infinity, NaN의 의미와 비트 패턴
+- [ ] 정수 오버플로우 조건 (양+양→음, 음+음→양)
+- [ ] 곱셈 HW: 기본→optimized→faster 구조
+- [ ] 나눗셈이 곱셈보다 병렬화 어려운 이유 (conditional subtraction)
+- [ ] FP 덧셈 vs FP 곱셈 절차 차이
+- [ ] Guard/Round/Sticky bits의 역할
+- [ ] SIMD/Subword parallelism 개념
+- [ ] FP associativity 불성립과 병렬 프로그램 영향
+- [ ] RISC-V FP 레지스터(f0~f31)와 정수 레지스터 분리
+- [ ] Arithmetic right shift ≠ signed division (음수에서 차이)
