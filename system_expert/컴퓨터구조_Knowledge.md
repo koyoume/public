@@ -1,15 +1,29 @@
 # 컴퓨터구조 Knowledge
 
-> 삼성DS · COD (Computer Organization & Design) RISC-V  
-> 최종 업데이트: 2026-04-13 · Ch1
+> 삼성DS · COD (Computer Organization & Design) RISC-V
+> 최종 업데이트: 2026-04-15 · Ch1~Ch2
 
 ---
 
 ## ① 수식 모음
 
-| 수식 | 의미 | 변수 설명 | 비고 |
-|------|------|----------|------|
-| (Ch1에서는 성능 수식이 다루어지지 않음 — Ch1은 개념/배경 챕터) | | | 이후 챕터에서 누적 추가 |
+| 수식 | 의미 | 변수 설명 | 조건/비고 |
+|------|------|----------|----------|
+| `CPU Time = IC × CPI × T_c` | CPU 실행 시간 | IC=명령어 수, CPI=명령어당 사이클, T_c=클럭 주기 | 성능 비교의 기본 수식 |
+| `CPU Time = Clock Cycles / Clock Rate` | 위와 동치 | Clock Cycles = IC × CPI, Clock Rate = 1/T_c | |
+| `Performance = 1 / Execution Time` | 성능 정의 | | 높을수록 빠름 |
+| `Speedup = Perf_X/Perf_Y = Time_Y/Time_X` | X가 Y보다 몇 배 빠른가 | | |
+| `CPI = Σ(CPI_i × IC_i) / IC_total` | 가중 평균 CPI | CPI_i=클래스별 CPI, IC_i=클래스별 명령어 수 | 명령어 mix 반영 |
+| `Power = C × V² × f` | CMOS 동적 전력 | C=capacitive load, V=전압, f=주파수 | |
+| `T_improved = T_affected/n + T_unaffected` | Amdahl's Law | n=개선 배율 | 전체 성능 상한 결정 |
+| `Cost/die = Cost_wafer / (Dies/wafer × Yield)` | 다이 비용 | 다이 면적↑ → 비용 비선형↑ | |
+| `Yield ≈ 1/(1 + Defects×Die_area/2)²` | 수율 근사 | | 경험적 모델 |
+| `SPEC ratio = Ref_time / Target_time` | SPEC 점수 | 높을수록 빠름 | |
+| `Overall SPEC = (Π ratio_i)^(1/n)` | SPEC 기하 평균 | n=벤치마크 수 | |
+| `Moore's Law: 현재 × 2^(n/2)` | n년 후 트랜지스터 수 | | 경험적 관찰 |
+| `slli by i = ×2^i` | 좌 시프트 = 곱셈 | | |
+| `srli by i = ÷2^i` | 우 논리 시프트 = 나눗셈 | | unsigned only |
+| `Byte offset = index × 8` | doubleword 배열 주소 | A[i] → offset = i×8 | |
 
 ---
 
@@ -17,12 +31,20 @@
 
 | 비교 항목 | A | B | 차이점 |
 |----------|---|---|--------|
-| **ISA vs ABI** | ISA: HW/SW 인터페이스 (명령어 집합) | ABI: ISA + 시스템 SW 인터페이스 (시스템콜 규약, 레지스터 규약 등) | ISA가 같아도 OS가 다르면 ABI가 달라 바이너리 호환 불가 |
-| **ISA vs Implementation** | ISA: "무엇을 할 수 있는가" (인터페이스 명세) | Implementation: "어떻게 구현하는가" (마이크로아키텍처) | 같은 x86 ISA를 Intel과 AMD가 다르게 구현 가능 |
-| **Resistive vs Capacitive 터치** | 두 전도층의 물리적 접촉 | 손가락의 정전용량 변화 감지 | Capacitive: 멀티터치 가능, 대부분 스마트폰 사용 |
-| **SRAM vs DRAM (개요)** | 빠르고 비쌈 (캐시) | 느리고 저렴 (메인 메모리) | 메모리 계층의 핵심 — Ch5에서 상세 |
-| **P-core vs E-core** | Performance core (고성능, 고전력) | Efficiency core (저전력, 백그라운드) | 이종 코어 아키텍처 (Intel Arrow Lake, ARM big.LITTLE) |
-| **Desktop vs Server vs Embedded** | 범용/비용-성능 트레이드오프 | 높은 용량·성능·신뢰성 / 전력·비용 제약 엄격 | 설계 최적화 기준이 다름 |
+| ISA vs ABI | HW/SW 인터페이스(명령어 집합) | ISA + 시스템SW 인터페이스 | ISA 같아도 OS 다르면 ABI 다름 |
+| ISA vs Implementation | 명세("무엇을") | 마이크로아키텍처("어떻게") | Intel/AMD 같은 x86 다르게 구현 |
+| RISC vs CISC | 단순·규칙·고정길이 | 복잡·가변길이 | RISC: HW 간결→파이프라이닝 용이 |
+| Response Time vs Throughput | 작업 완료 시간 | 단위시간당 총 작업량 | 빠른CPU→둘다↑, CPU추가→주로Throughput↑ |
+| Elapsed vs CPU Time | 전체응답(I/O,OS포함) | 순수 연산만 | CPU Time으로 CPU 성능 비교 |
+| Volatile vs Non-volatile | DRAM(전원off시 소실) | HDD,SSD,Flash(보존) | |
+| SRAM vs DRAM | 빠르고 비쌈(캐시) | 느리고 저렴(메인메모리) | 메모리 계층 핵심 |
+| Saved vs Temporary regs | x8-9,x18-27(callee보존) | x5-7,x28-31(비보존) | 함수호출 저장/복원 규약 |
+| Leaf vs Non-leaf | 다른 함수 호출 안 함 | 다른 함수 호출함 | Non-leaf: ra(x1)도 스택 저장 필수 |
+| lb vs lbu | Sign extend | Zero extend | 부호 있는/없는 바이트 로드 |
+| blt/bge vs bltu/bgeu | Signed 비교 | Unsigned 비교 | 같은 비트도 해석 다름 |
+| Static vs Dynamic linking | 컴파일시 라이브러리 포함 | 실행시 필요할때 로드 | Dynamic: 경량화, 자동 버전 업데이트 |
+| Array vs Pointer | 매번 index×size+base | 주소 직접 증가 | 컴파일러가 동일 최적화 가능→배열 권장 |
+| PC-relative vs Absolute | PC+offset(분기) | 전체주소(lui+jalr) | PC-relative: 위치독립, 짧은 인코딩 |
 
 ---
 
@@ -30,26 +52,32 @@
 
 | 용어 | 정의 |
 |------|------|
-| ABI (Application Binary Interface) | ISA에 시스템 소프트웨어 인터페이스(시스템콜 규약, 레지스터 사용 규약 등)를 더한 것. 같은 ISA라도 OS가 다르면 ABI가 다를 수 있음 |
-| Abstraction (추상화) | 하위 수준의 복잡한 세부사항을 숨기고 상위 수준에서는 단순화된 인터페이스만 노출하는 설계 원칙 |
-| Assembly Language | 기계어의 텍스트(니모닉) 표현. Assembler가 이진 기계어로 변환 |
-| Cache Memory | CPU 내부 또는 근처에 위치한 소형 고속 SRAM. 자주 사용되는 데이터를 보관하여 메인 메모리 접근 지연을 줄임 |
-| Cloud Computing | 창고 규모 컴퓨터(WSC)에서 SaaS 형태로 서비스 제공. 소프트웨어 일부는 클라이언트, 일부는 서버에서 실행 |
-| Compiler | 고수준 언어(HLL) 소스코드를 기계어(어셈블리→이진)로 번역하는 시스템 소프트웨어 |
-| Control | 프로세서 내부에서 명령어를 해석(decode)하고 Datapath에 제어 신호를 보내는 유닛 |
-| Datapath | 프로세서 내부에서 실제 데이터 연산(ALU, 레지스터 읽기/쓰기 등)을 수행하는 유닛 |
-| Embedded Computer | 다른 시스템(자동차, 가전 등)의 내부 부품으로 숨어 있는 컴퓨터. 전력/성능/비용 제약이 엄격 |
-| Frame Buffer | 디스플레이에 표시할 픽셀 데이터를 저장하는 메모리 영역. 화면은 이 버퍼 내용을 반영 |
-| HLL (High-Level Language) | C, Java, Python 등 인간이 읽기 쉬운 프로그래밍 언어. 컴파일러가 기계어로 변환 |
-| Implementation | ISA 명세를 실제로 구현한 하드웨어의 세부 설계 (마이크로아키텍처) |
-| ISA (Instruction Set Architecture) | 하드웨어와 소프트웨어 사이의 인터페이스. 프로세서가 이해하는 명령어 집합과 규약을 정의 |
-| Moore's Law (무어의 법칙) | 집적 회로의 트랜지스터 수가 약 2년마다 2배로 증가한다는 경험적 관찰 (물리 법칙 아님) |
-| Operating System (OS) | I/O 처리, 메모리/저장장치 관리, 태스크 스케줄링 및 자원 공유를 담당하는 시스템 소프트웨어 |
-| Pixel (Picture Element) | 디스플레이 화면을 구성하는 최소 단위. 프레임 버퍼의 비트 값이 색상/밝기를 결정 |
-| PMD (Personal Mobile Device) | 배터리 구동, 인터넷 연결, 수백 달러 가격대의 개인 모바일 장치 (스마트폰, 태블릿 등) |
-| SoC (System on Chip) | CPU, GPU, NPU, 메모리 컨트롤러 등을 하나의 칩에 집적한 형태. PMD 시대의 주류 설계 |
-| Supercomputer | 최고 성능의 과학/공학 계산용 컴퓨터. 시장 비중은 작지만 최고 성능 추구 |
-| WSC (Warehouse Scale Computer) | 클라우드 서비스를 위한 창고 규모의 대형 컴퓨팅 시스템 |
+| ABI | ISA + 시스템SW 인터페이스. 같은 ISA라도 OS 다르면 ABI 다를 수 있음 |
+| Abstraction | 하위 세부사항을 숨기고 단순 인터페이스만 노출하는 설계 원칙 |
+| Amdahl's Law | 부분 개선이 전체 성능에 비례하지 않음. T=T_affected/n + T_unaffected |
+| Basic Block | 중간에 분기 없고 분기대상도 처음뿐인 명령어 시퀀스. 최적화 기본 단위 |
+| Cache Memory | CPU 내/근처 소형 고속 SRAM. 메인메모리 접근 지연 감소 |
+| CISC | 복잡·다양·가변길이 명령어. x86 대표 |
+| CPI | 명령어당 평균 클럭 사이클. CPU HW와 명령어 mix에 의해 결정 |
+| Datapath | 프로세서 내부 데이터 연산 유닛 (ALU, 레지스터) |
+| Control | 명령어 해석(decode) → Datapath에 제어 신호 |
+| Design Principle 1 | Simplicity favors regularity |
+| Design Principle 2 | Smaller is faster |
+| Design Principle 3 | Good design demands good compromises |
+| Dynamic Linking | 호출 시점에만 라이브러리 로드. Lazy Linkage |
+| IC (Instruction Count) | 프로그램 실행 시 총 명령어 수 |
+| ISA | HW/SW 인터페이스. 프로세서가 이해하는 명령어 집합 정의 |
+| Little Endian | 최하위 바이트가 가장 낮은 주소. RISC-V 사용 |
+| lr.d / sc.d | Load Reserved / Store Conditional. 동기화용 atomic 쌍 |
+| lui | 20-bit 상수를 rd[31:12]에 로드, sign extend, [11:0]=0 |
+| Moore's Law | IC 트랜지스터 수 약 2년마다 2배. 경험적 관찰(물리법칙 아님) |
+| Power Wall | 전압/발열 한계로 클럭 향상 불가 → 멀티코어 전환 |
+| R/I/S/SB/U/UJ-type | RISC-V 6가지 32-bit 고정길이 명령어 포맷 |
+| RISC-V | UC Berkeley 개발 오픈 RISC ISA. 이 과목 기준 ISA |
+| Sign Extension | 넓은 비트 확장 시 부호비트 복제. lb(sign), lbu(zero) |
+| SPEC | Standard Performance Evaluation Corp. 기하평균 벤치마크 |
+| Stored Program | 명령어도 이진수로 메모리 저장. 프로그램이 프로그램 조작 가능 |
+| Yield | 웨이퍼당 정상 다이 비율. 면적↑→수율↓→비용 비선형↑ |
 
 ---
 
@@ -57,168 +85,66 @@
 
 ### Chapter 1: Computer Abstractions and Technology
 
-#### 1-1. 무어의 법칙과 컴퓨터 혁명
+(이전 채팅에서 상세 정리 완료 — 60 slides 전체 반영)
 
-무어의 법칙은 "IC의 트랜지스터 수가 약 2년마다 2배 증가"한다는 경험적 관찰이다. 1971년 Intel 4004 (2,300개)에서 2018년 72-core Xeon (수십억 개)까지, 로그 스케일 그래프에서 거의 직선으로 증가했다.
+핵심 토픽: 무어의 법칙, 컴퓨터 분류(PC/Server/Super/Embedded/PMD/Cloud), 8 Great Ideas, SW 계층(App/System/HW), HW 5대 구성(Input/Output/Processor/Memory/Cache), ISA/ABI/Implementation, IC 제조와 비용(Yield, Cost/die), 성능 수식(CPU Time=IC×CPI×Tc), CPI mix, Power Wall(P=CV²f), Amdahl's Law, SPEC 벤치마크, 멀티프로세서 전환
 
-```
-트랜지스터 수 (로그)
- 50B ─ ● 72-core Xeon (2018~)
- 10B ─
-  1B ─ ● Dual-core Itanium 2 (2006~)
-100M ─ ● Pentium 4 (2000~)
- 10M ─ ● Pentium (1993)
-  1M ─ ● Intel 80486 (1989)
-100K ─ ● Intel 80386 (1985)
- 10K ─ ● Intel 8080 (1974)
-  1K ─ ● Intel 4004 (1971)
-      └──────────────────────
-       1970    1990    2010
-```
+**CPU Time 예시**: A(2GHz,10s) → Cycles=20G. B 목표 6s, 1.2×cycles → Rate_B=24G/6=4GHz
 
-- **핵심 응용**: 자동차 컴퓨터, 스마트폰, 유전체 프로젝트, WWW, 검색 엔진, ML/AI
-- **주의**: 물리 법칙이 아닌 경험적 관찰. 미세공정 한계로 둔화 → 병렬 처리 중요성 증대
+**CPI mix 예시**: Class A(CPI=1), B(2), C(3). Seq1(2,1,2)→10cycles/5IC=CPI2.0. Seq2(4,1,1)→9cycles/6IC=CPI1.5 → IC 적다고 항상 빠른 것 아님
 
-**예시 문제**: 무어의 법칙에 따르면 트랜지스터 수가 2년마다 2배가 된다. 현재 10억 개 트랜지스터를 가진 칩이 있을 때, 10년 후 예상 트랜지스터 수는?
+**Amdahl 예시**: 100s 중 80s 개선. 5× 전체? → 80/n+20=20 → 불가능!
 
-풀이:
-- 10년 / 2년 = 5번 두 배
-- 10억 × 2^5 = 10억 × 32 = **320억 개**
+**Power 예시**: 85% C, 85% V, 85% f → P_new/P_old = 0.85×0.85²×0.85 = 0.85⁴ ≈ 0.52
 
-#### 1-2. 컴퓨터의 분류
+### Chapter 2: Instructions — Language of the Computer
 
-| 클래스 | 목적 | 핵심 설계 기준 |
-|--------|------|---------------|
-| Personal Computer | 범용, 다양한 SW | 비용/성능 트레이드오프 |
-| Server | 네트워크 기반 서비스 | 높은 용량, 성능, 신뢰성 |
-| Supercomputer | 과학/공학 계산 | 최고 성능 (시장 비중 작음) |
-| Embedded | 시스템 내부 부품 | 전력/성능/비용 제약 엄격 |
+(이전 채팅에서 상세 정리 완료 — 95 slides 전체 반영)
 
-PostPC 시대 (2011~): PMD (배터리, 인터넷, 수백 달러) + Cloud Computing (WSC, SaaS)
+핵심 토픽: Instruction Set 개념, RISC-V 소개, 산술 연산(3-오퍼랜드), DP1/2/3, 레지스터(32×64b), 메모리 오퍼랜드(ld/sd, Little Endian, byte addressing), 즉시값(addi), 부호(2's complement, sign extension), 6가지 명령어 포맷(R/I/S/SB/U/UJ), 논리연산(sll/srl/and/or/xor), 분기(beq/bne/blt/bge/bltu/bgeu), 프로시저(jal/jalr, 스택, leaf/non-leaf, 재귀 fact), Memory Layout, 문자 데이터(ASCII/Unicode, lb/lbu/sb), 32-bit 상수(lui+addi), Branch/Jump addressing(PC-relative), 동기화(lr.d/sc.d), 번역 과정(Compiler→Assembler→Linker→Loader), Dynamic Linking, Sort 종합예시, Array vs Pointer, x86 비교, RISC-V Extensions(I/M/A/F/D/C), Fallacies & Pitfalls, SPEC2006 명령어 빈도
 
-#### 1-3. 8가지 위대한 아이디어 (Eight Great Ideas)
+**R-type 인코딩 예시**: add x9,x20,x21 → 0000000|10101|10100|000|01001|0110011 = 0x015A04B3
 
-| # | 아이디어 | 설명 | 관련 챕터/개념 |
-|---|---------|------|-------------|
-| 1 | Design for Moore's Law | 완성 시점의 기술 수준에 맞춰 설계 | 전체 |
-| 2 | Use Abstraction | 복잡성을 계층적으로 숨김 | ISA, 전체 |
-| 3 | Make Common Case Fast | 자주 발생하는 경우를 빠르게 | Amdahl's Law |
-| 4 | Performance via Parallelism | 여러 작업 동시 수행 | 멀티코어 |
-| 5 | Performance via Pipelining | 작업을 단계별로 나누어 중첩 | Ch4 파이프라인 |
-| 6 | Performance via Prediction | 예측하고 틀리면 복구 | Branch prediction |
-| 7 | Hierarchy of Memories | 빠른-비싼 / 느린-싼 메모리 계층 배치 | Ch5 캐시 |
-| 8 | Dependability via Redundancy | 중복으로 신뢰성 확보 | RAID, ECC |
+**if-else 예시**: bne x22,x23,Else / add x19,x20,x21 / beq x0,x0,Exit / Else: sub / Exit:
 
-#### 1-4. 소프트웨어 계층 구조
-
-```
-┌─────────────────────────────┐
-│     Applications Software    │  ← HLL로 작성
-├─────────────────────────────┤
-│      Systems Software        │
-│  Compiler: HLL → 기계어       │
-│  OS: I/O, 메모리, 스케줄링     │
-├─────────────────────────────┤
-│         Hardware             │
-│  Processor, Memory, I/O     │
-└─────────────────────────────┘
-```
-
-프로그램 코드 변환 과정 (swap 예시):
-
-```
-C (HLL)                    RISC-V Assembly           Binary Machine Code
-swap(int v[], int k)       swap:                     00000000001011010...
-{int temp;                   slli x6, x11, 3         00000000011010010...
-    temp = v[k];             add  x6, x10, x6        ...
-    v[k] = v[k+1];          ld   x5, 0(x6)
-    v[k+1] = temp;          ld   x7, 8(x6)
-}                            sd   x7, 0(x6)
-        │                    sd   x5, 8(x6)
-        ▼ Compiler           jalr x0, 0(x1)
-                                    │
-                                    ▼ Assembler
-```
-
-#### 1-5. 하드웨어 5대 구성 요소
-
-모든 컴퓨터 (Desktop, Server, Supercomputer, Embedded) 동일:
-
-```
-                ┌──────────────────────┐
-                │      Computer        │
- Input ────►    │  ┌────────────────┐  │  ────► Output
-                │  │   Processor    │  │
-                │  │ ┌──────┐┌────┐│  │
-                │  │ │Control││Data││  │
-                │  │ │      ││path││  │
-                │  │ └──────┘└────┘│  │
-                │  └───────┬────────┘  │
-                │          │           │
-                │  ┌───────▼────────┐  │
-                │  │    Memory      │  │
-                │  └────────────────┘  │
-                └──────────────────────┘
-```
-
-- **Datapath**: 데이터 연산 수행 (ALU, 레지스터)
-- **Control**: 명령어 해석, 제어 신호 생성
-- **Cache Memory**: CPU 내부 소형 고속 SRAM
-- **I/O**: User-interface (디스플레이, 키보드, 마우스), Storage (HDD, SSD), Network
-
-#### 1-6. 프로세서 진화: 단일코어 → 이종코어 SoC
-
-```
-2007 AMD Barcelona     2024 Intel Arrow Lake        2025 Apple A18 Pro
-┌──────────────┐      ┌───────────────────┐       ┌──────────────┐
-│ Core1  Core2 │      │ P-core×8  E-core×4│       │ CPU  5c-GPU  │
-│ Core4  Core3 │      │ (Lion Cove+Skymont)│       │ NPU  MemCtrl │
-│  2MB L3共有   │      │ Ring + 36MB L3    │       │ 단일 SoC 집적  │
-└──────────────┘      └───────────────────┘       └──────────────┘
-   동종 멀티코어           이종 하이브리드            모바일 SoC
-```
-
-#### 1-7. 추상화: ISA / ABI / Implementation
-
-```
-Application
-     │
-  HLL (C, Java, ...)
-     │
-═══ ABI ═══  (ISA + 시스템 SW 인터페이스)
-     │
-  OS / Compiler
-     │
-═══ ISA ═══  (HW/SW 인터페이스)
-     │
-  Hardware (Implementation)
-```
-
-- **ISA**: 프로세서가 이해하는 명령어 집합 정의 (RISC-V, ARM, x86)
-- **ABI**: ISA + 시스템콜 규약 + 레지스터 사용 규약
-- **Implementation**: ISA를 실제로 구현한 마이크로아키텍처
-
-**예시 문제**: "같은 ISA인데 왜 Intel과 AMD의 CPU 성능이 다른가?"
-
-풀이: ISA는 "무엇을 할 수 있는가"의 명세이고, Implementation은 "어떻게 구현하는가"의 세부사항이다. 같은 x86 ISA라도 파이프라인 깊이, 캐시 크기, 분기 예측 알고리즘 등 마이크로아키텍처가 다르면 성능이 달라진다. ISA는 SW 호환성을, Implementation은 HW 성능을 결정한다.
+**Factorial 예시**: sp-=16, sd x1/x10, base→return 1, recursive→jal fact, mul x10,x10,x6
 
 ---
 
 ## ⑤ 시험 대비 체크리스트
 
-### 개념 문제 유형
-- [ ] 무어의 법칙 정의, 한계, "물리 법칙 아님" 구분
-- [ ] 컴퓨터 4분류 (PC/Server/Super/Embedded) 각각의 설계 기준
-- [ ] PostPC 시대: PMD vs Cloud의 정의와 특징
-- [ ] 8가지 Great Ideas 전체 나열 및 각각 1줄 설명
-- [ ] ISA vs ABI vs Implementation 차이
-- [ ] 소프트웨어 3계층 (Application/System/Hardware) 및 각 역할
-- [ ] Compiler vs OS의 역할 구분
-- [ ] Datapath vs Control의 역할 구분
-- [ ] Cache Memory의 목적 (SRAM, 빠른 접근)
-- [ ] 프레임 버퍼와 디스플레이의 관계
-- [ ] Resistive vs Capacitive 터치스크린 차이
+### Ch1 계산
+- [ ] CPU Time = IC × CPI × T_c
+- [ ] 두 컴퓨터 speedup 계산
+- [ ] Weighted average CPI (명령어 mix)
+- [ ] Amdahl's Law (개선 후 시간, 달성 가능 여부)
+- [ ] Power = C×V²×f (전력 절감 비율)
+- [ ] Moore's Law: n년 후 트랜지스터 수
+- [ ] SPEC ratio / 기하 평균
+- [ ] IC Cost: yield, cost/die
 
-### 계산 문제 유형
-- [ ] 무어의 법칙 적용: n년 후 트랜지스터 수 계산 (현재 × 2^(n/2))
-- [ ] (이후 챕터에서 CPU Time, CPI, Amdahl's Law 등 추가 예정)
+### Ch1 개념
+- [ ] 8 Great Ideas 나열 및 1줄 설명
+- [ ] ISA vs ABI vs Implementation
+- [ ] Response Time vs Throughput
+- [ ] Power Wall과 멀티코어 전환 이유
+- [ ] MIPS 지표의 한계
+
+### Ch2 계산
+- [ ] C → RISC-V 변환 (산술, if/else, while, 함수)
+- [ ] R-type 32-bit 이진/16진 인코딩
+- [ ] 배열 주소 계산 (index×8+base)
+- [ ] 2's complement 부정(반전+1), sign extension
+- [ ] 스택 프레임 크기와 sp 변화 추적
+
+### Ch2 개념
+- [ ] DP 1, 2, 3 의미와 적용 예
+- [ ] 6가지 명령어 포맷 (R/I/S/SB/U/UJ) 용도와 필드
+- [ ] Saved vs Temporary 레지스터 규약
+- [ ] Leaf vs Non-leaf (ra 저장 여부)
+- [ ] Memory Layout (Text/Static/Heap/Stack)
+- [ ] lr.d/sc.d 동기화 원리
+- [ ] Static vs Dynamic linking
+- [ ] Stored Program Concept
+- [ ] Little Endian
+- [ ] lb vs lbu, blt vs bltu
