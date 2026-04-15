@@ -1,7 +1,7 @@
 # 컴퓨터구조 Knowledge
 
 > 삼성DS · COD (Computer Organization & Design) RISC-V
-> 최종 업데이트: 2026-04-15 · Ch1~Ch3
+> 최종 업데이트: 2026-04-15 · Ch1~Ch4
 
 ---
 
@@ -29,6 +29,8 @@
 | `FP값 = (-1)^S × (1+Frac) × 2^(Exp-Bias)` | IEEE 754 부동소수점 값 | S=부호, Frac=소수부, Exp=지수, Bias=127(single)/1023(double) | 정규화 기준, hidden bit=1 |
 | `Single range: ±1.2×10⁻³⁸ ~ ±3.4×10³⁸` | 단정밀도 범위 | 정밀도 ~6자리 십진수 (2⁻²³) | Exp 8bit, Frac 23bit |
 | `Double range: ±2.2×10⁻³⁰⁸ ~ ±1.8×10³⁰⁸` | 배정밀도 범위 | 정밀도 ~16자리 십진수 (2⁻⁵²) | Exp 11bit, Frac 52bit |
+| `Speedup_pipeline ≈ Stages` (이상적) | 파이프라인 이상적 속도 향상 | Stages=파이프라인 단계 수 | 균형 잡힌 경우. 불균형 시 더 적음 |
+| `IPC = 1/CPI` | 사이클당 명령어 수 | Multiple issue에서 CPI<1일 때 사용 | peak IPC=issue width |
 
 ---
 
@@ -56,6 +58,13 @@
 | Restoring vs Non-restoring div | 음수 나머지 시 divisor 다시 더함 | 다음 단계에서 보정 | Restoring이 더 단순, Non-restoring이 더 빠름 |
 | Guard/Round/Sticky bits | 추가 정밀도 비트 | | 정확한 반올림을 위한 IEEE 754 메커니즘 |
 | Integer regs vs FP regs | x0~x31 (32×64-bit) | f0~f31 (32×64-bit) | 별도 레지스터 파일. FP 명령어는 FP 레지스터만 사용 |
+| Single-cycle vs Pipelined | 한 사이클에 명령어 완료, T_c=최긴 경로 | 5 stage 중첩, T_c=최긴 stage | Pipelined: throughput↑, latency 동일 |
+| Forwarding vs Stalling | 결과를 즉시 전달(bypass) | 1+cycle 대기(bubble 삽입) | Forwarding이 성능↑. Load-use는 stall 불가피 |
+| Static vs Dynamic branch pred | 컴파일러가 방향 예측(backward taken 등) | HW가 BHT로 런타임 예측(1-bit,2-bit) | Dynamic이 정확도↑, HW 복잡도↑ |
+| Static vs Dynamic multiple issue | 컴파일러가 issue slot 패킹(VLIW) | CPU가 런타임에 발행 결정(Superscalar) | Static: 컴파일러 의존. Dynamic: HW 복잡↑, OoO 가능 |
+| In-order vs Out-of-order | 프로그램 순서대로 실행 (A53) | 의존성 없으면 먼저 실행 (i7) | OoO: 성능↑ 전력↑ 복잡도↑ |
+| Exception vs Interrupt | CPU 내부 발생(opcode,overflow,syscall) | 외부 I/O 컨트롤러 | 처리 메커니즘 유사: SEPC/SCAUSE 저장→handler |
+| ARM A53 vs Intel i7 | PMD, 100mW, 8-stage in-order | Server, 130W, 14-stage OoO+speculation | 전력효율 vs 절대성능 |
 
 ---
 
@@ -78,10 +87,15 @@
 | Design Principle 2 | Smaller is faster |
 | Design Principle 3 | Good design demands good compromises |
 | Dynamic Linking | 호출 시점에만 라이브러리 로드. Lazy Linkage |
+| Exception | CPU 내부에서 발생하는 예외(undefined opcode, overflow, syscall). SEPC/SCAUSE에 기록 후 handler로 점프 |
+| Forwarding (Bypassing) | 파이프라인에서 결과가 나오면 레지스터 write 전에 바로 다음 명령어 입력으로 전달. Data hazard 해결 |
+| Hazard | 파이프라인에서 다음 명령어를 즉시 시작하지 못하게 하는 상황. Structural/Data/Control 3종류 |
 | IC (Instruction Count) | 프로그램 실행 시 총 명령어 수 |
 | IEEE 754 | 부동소수점 표현 및 연산의 국제 표준. Single(32-bit), Double(64-bit). Bias, hidden bit, 특수값(±0, ±Inf, NaN, Denormal) 정의 |
 | Infinity (±∞) | Exp=111...1, Frac=000...0. 오버플로우 시 사용. 후속 계산에 전파 가능 |
 | ISA | HW/SW 인터페이스. 프로세서가 이해하는 명령어 집합 정의 |
+| ILP (Instruction-Level Parallelism) | 파이프라인/다중 발행으로 여러 명령어를 동시 실행하는 병렬성 |
+| IPC (Instructions Per Cycle) | 사이클당 명령어 수. CPI<1일 때(multiple issue) 사용. IPC=1/CPI |
 | Little Endian | 최하위 바이트가 가장 낮은 주소. RISC-V 사용 |
 | lr.d / sc.d | Load Reserved / Store Conditional. 동기화용 atomic 쌍 |
 | lui | 20-bit 상수를 rd[31:12]에 로드, sign extend, [11:0]=0 |
@@ -90,6 +104,8 @@
 | OPEX (Operating Expenditure) | 운영 지출. 전력·냉각·인건비·유지보수·네트워크 등 지속적 비용. 데이터센터에서 전력이 OPEX의 핵심 |
 | Overflow | 연산 결과가 표현 가능 범위 초과. 정수: 부호 반전으로 감지. FP: Infinity로 처리 |
 | Power Wall | 전압/발열 한계로 클럭 향상 불가 → 멀티코어 전환 |
+| Pipeline | 명령어 실행을 여러 stage로 나누어 중첩 실행. Throughput↑, Latency 동일 |
+| Pipeline Register | 각 stage 사이의 레지스터. 이전 cycle 정보 보존 (IF/ID, ID/EX, EX/MEM, MEM/WB) |
 | R/I/S/SB/U/UJ-type | RISC-V 6가지 32-bit 고정길이 명령어 포맷 |
 | RISC-V | UC Berkeley 개발 오픈 RISC ISA. 이 과목 기준 ISA |
 | Saturating Operation | 오버플로우 시 wrap-around 대신 최대/최소값으로 고정. 오디오/비디오 처리에 사용 |
@@ -97,6 +113,8 @@
 | Sign Extension | 넓은 비트 확장 시 부호비트 복제. lb(sign), lbu(zero) |
 | SPEC | Standard Performance Evaluation Corp. 기하평균 벤치마크 |
 | Stored Program | 명령어도 이진수로 메모리 저장. 프로그램이 프로그램 조작 가능 |
+| Superscalar | Dynamic multiple issue. CPU가 런타임에 사이클당 여러 명령어 발행. OoO 실행 가능 |
+| Speculation | 분기 결과 등을 예측하여 미리 실행. 맞으면 commit, 틀리면 flush+rollback |
 | TCO (Total Cost of Ownership) | 총 소유 비용 = CAPEX + OPEX. 시스템의 전체 수명 동안 발생하는 모든 비용. 성능 평가 시 단순 구매가가 아닌 TCO 기준이 실질적 |
 | perf/TCO | TCO 단위당 성능. 실질적 가성비 지표. 전력 효율이 좋은 시스템은 OPEX↓→TCO↓→perf/TCO↑ |
 | Yield | 웨이퍼당 정상 다이 비율. 면적↑→수율↓→비용 비선형↑ |
@@ -171,6 +189,22 @@ perf/TCO ↑ 전략:
 **FP 덧셈**: Step1 지수정렬 → Step2 가수덧셈 → Step3 정규화 → Step4 반올림
 **FP 곱셈**: Step1 지수덧셈 → Step2 가수곱셈 → Step3 정규화 → Step4 반올림 → Step5 부호결정
 
+### Chapter 4: The Processor
+
+(이전 채팅에서 상세 정리 완료 — 129 slides 전체 반영)
+
+핵심 토픽: Logic Design(조합/순차, clocking methodology), Single-cycle Datapath(IF→ID→EX→MEM→WB, critical path=ld), ALU Control(ALUOp+funct→ALU control), 5-Stage Pipeline(IF/ID/EX/MEM/WB, throughput↑ latency 동일, Speedup≈stages), Pipeline Registers(IF/ID, ID/EX, EX/MEM, MEM/WB), Hazards 3종(Structural→메모리분리, Data→Forwarding/Stall, Control→Branch Prediction), Forwarding 감지 조건(EX/MEM.Rd=ID/EX.Rs1등), Load-Use Hazard(stall+bubble, code scheduling으로 회피), Branch Prediction(static/dynamic, 1-bit/2-bit, BTB), Exception/Interrupt(SEPC/SCAUSE, flush, handler), ILP(Deeper pipeline, Multiple issue), Static issue(VLIW, dual-issue), Dynamic issue(Superscalar, OoO, Reservation Station, Reorder Buffer), Speculation(branch/load), Loop Unrolling+Register Renaming, ARM A53(in-order 100mW) vs i7(OoO 130W)
+
+**Pipeline performance**: Single-cycle T_c=800ps vs Pipelined T_c=200ps → 4× speedup
+
+**Forwarding 조건**: EX hazard: EX/MEM.Rd = ID/EX.Rs1 or Rs2 (Rd≠0, RegWrite=1). MEM hazard: MEM/WB.Rd = ID/EX.Rs1 or Rs2 (EX hazard 아닐 때만)
+
+**Load-Use stall**: ID/EX.MemRead AND (ID/EX.Rd = IF/ID.Rs1 or Rs2) → bubble
+
+**Code scheduling 예시**: ld 사이에 독립 명령어 끼워 stall 제거 (13→11 cycles)
+
+**Dual-issue scheduling**: IPC=5/4=1.25. Loop unrolling(4×) 후 IPC=14/8=1.75
+
 ---
 
 ## ⑤ 시험 대비 체크리스트
@@ -232,3 +266,27 @@ perf/TCO ↑ 전략:
 - [ ] FP associativity 불성립과 병렬 프로그램 영향
 - [ ] RISC-V FP 레지스터(f0~f31)와 정수 레지스터 분리
 - [ ] Arithmetic right shift ≠ signed division (음수에서 차이)
+
+### Ch4 계산
+- [ ] Single-cycle vs Pipelined 성능 비교 (T_c, throughput, speedup)
+- [ ] 파이프라인 타이밍 다이어그램 그리기 (multi-cycle diagram)
+- [ ] Forwarding 필요 여부 판별 (EX/MEM, MEM/WB hazard 조건)
+- [ ] Load-use hazard 감지 및 stall 후 cycle 수 계산
+- [ ] Code scheduling으로 stall 제거 (명령어 재배치)
+- [ ] Dual-issue 스케줄링 및 IPC 계산
+- [ ] Loop unrolling 후 IPC 계산
+- [ ] Branch misprediction penalty 계산
+
+### Ch4 개념
+- [ ] 5-stage pipeline 각 단계(IF/ID/EX/MEM/WB) 역할
+- [ ] Pipeline이 throughput↑이지 latency↓가 아닌 이유
+- [ ] 3가지 Hazard(Structural/Data/Control) 정의와 해결책
+- [ ] Forwarding(Bypassing) 원리와 한계(load-use)
+- [ ] Load-use stall 감지 조건과 bubble 삽입 메커니즘
+- [ ] Branch prediction: static vs dynamic, 1-bit vs 2-bit, BTB
+- [ ] Exception vs Interrupt, SEPC/SCAUSE, precise exception
+- [ ] Static multiple issue(VLIW) vs Dynamic(Superscalar)
+- [ ] Out-of-order execution: Reservation Station, Reorder Buffer
+- [ ] Speculation 원리와 rollback
+- [ ] RISC-V ISA가 파이프라인에 유리한 이유 (32-bit 고정, 규칙적 포맷)
+- [ ] Critical path가 clock period를 결정하는 원리
