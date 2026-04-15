@@ -24,6 +24,8 @@
 | `slli by i = ×2^i` | 좌 시프트 = 곱셈 | | |
 | `srli by i = ÷2^i` | 우 논리 시프트 = 나눗셈 | | unsigned only |
 | `Byte offset = index × 8` | doubleword 배열 주소 | A[i] → offset = i×8 | |
+| `TCO = CAPEX + OPEX` | 총 소유 비용 | CAPEX=초기 투자, OPEX=운영 비용 | perf/TCO로 실질 가성비 평가 |
+| `perf/TCO` | TCO 단위당 성능 | perf=성능(throughput 등), TCO=총 소유 비용 | 높을수록 가성비 좋음 |
 
 ---
 
@@ -45,6 +47,7 @@
 | Static vs Dynamic linking | 컴파일시 라이브러리 포함 | 실행시 필요할때 로드 | Dynamic: 경량화, 자동 버전 업데이트 |
 | Array vs Pointer | 매번 index×size+base | 주소 직접 증가 | 컴파일러가 동일 최적화 가능→배열 권장 |
 | PC-relative vs Absolute | PC+offset(분기) | 전체주소(lui+jalr) | PC-relative: 위치독립, 짧은 인코딩 |
+| CAPEX vs OPEX | 초기 투자비(서버·장비 구매) | 운영비(전력·냉각·인건비·유지보수) | TCO=CAPEX+OPEX. 데이터센터에서 OPEX(특히 전력)가 TCO의 상당 부분 차지 |
 
 ---
 
@@ -57,6 +60,7 @@
 | Amdahl's Law | 부분 개선이 전체 성능에 비례하지 않음. T=T_affected/n + T_unaffected |
 | Basic Block | 중간에 분기 없고 분기대상도 처음뿐인 명령어 시퀀스. 최적화 기본 단위 |
 | Cache Memory | CPU 내/근처 소형 고속 SRAM. 메인메모리 접근 지연 감소 |
+| CAPEX (Capital Expenditure) | 자본적 지출. 서버·장비·인프라 등 초기 구매/구축 비용. 일회성 투자 |
 | CISC | 복잡·다양·가변길이 명령어. x86 대표 |
 | CPI | 명령어당 평균 클럭 사이클. CPU HW와 명령어 mix에 의해 결정 |
 | Datapath | 프로세서 내부 데이터 연산 유닛 (ALU, 레지스터) |
@@ -71,12 +75,15 @@
 | lr.d / sc.d | Load Reserved / Store Conditional. 동기화용 atomic 쌍 |
 | lui | 20-bit 상수를 rd[31:12]에 로드, sign extend, [11:0]=0 |
 | Moore's Law | IC 트랜지스터 수 약 2년마다 2배. 경험적 관찰(물리법칙 아님) |
+| OPEX (Operating Expenditure) | 운영 지출. 전력·냉각·인건비·유지보수·네트워크 등 지속적 비용. 데이터센터에서 전력이 OPEX의 핵심 |
 | Power Wall | 전압/발열 한계로 클럭 향상 불가 → 멀티코어 전환 |
 | R/I/S/SB/U/UJ-type | RISC-V 6가지 32-bit 고정길이 명령어 포맷 |
 | RISC-V | UC Berkeley 개발 오픈 RISC ISA. 이 과목 기준 ISA |
 | Sign Extension | 넓은 비트 확장 시 부호비트 복제. lb(sign), lbu(zero) |
 | SPEC | Standard Performance Evaluation Corp. 기하평균 벤치마크 |
 | Stored Program | 명령어도 이진수로 메모리 저장. 프로그램이 프로그램 조작 가능 |
+| TCO (Total Cost of Ownership) | 총 소유 비용 = CAPEX + OPEX. 시스템의 전체 수명 동안 발생하는 모든 비용. 성능 평가 시 단순 구매가가 아닌 TCO 기준이 실질적 |
+| perf/TCO | TCO 단위당 성능. 실질적 가성비 지표. 전력 효율이 좋은 시스템은 OPEX↓→TCO↓→perf/TCO↑ |
 | Yield | 웨이퍼당 정상 다이 비율. 면적↑→수율↓→비용 비선형↑ |
 
 ---
@@ -96,6 +103,33 @@
 **Amdahl 예시**: 100s 중 80s 개선. 5× 전체? → 80/n+20=20 → 불가능!
 
 **Power 예시**: 85% C, 85% V, 85% f → P_new/P_old = 0.85×0.85²×0.85 = 0.85⁴ ≈ 0.52
+
+#### 1-추가. perf/TCO — 실질적 가성비 지표
+
+컴퓨터 시스템의 가치를 평가할 때, 단순히 "성능(perf)"이나 "구매 가격"만 보면 안 된다. 실질적 가성비는 **perf/TCO**(총 소유 비용 대비 성능)로 평가한다.
+
+**TCO (Total Cost of Ownership) = CAPEX + OPEX**
+
+- **CAPEX (Capital Expenditure, 자본적 지출)**: 시스템을 도입할 때 발생하는 초기 투자 비용. 서버 구매비, 장비비, 인프라 구축비, 라이선스 비용 등. 일회성.
+
+- **OPEX (Operating Expenditure, 운영 지출)**: 시스템을 운영하는 동안 지속적으로 발생하는 비용. 전력 비용, 냉각 비용, 인건비(관리/유지보수), 네트워크 비용, 소프트웨어 유지보수 등.
+
+**왜 perf/TCO가 중요한가?**
+
+데이터센터에서는 서버 구매비(CAPEX)보다 **전력+냉각(OPEX)**이 TCO의 상당 부분을 차지한다. 따라서:
+- 저전력 프로세서는 OPEX↓ → TCO↓ → perf/TCO↑ (가성비 향상)
+- 비싼 고성능 서버라도 전력 효율이 좋으면 perf/TCO가 더 높을 수 있음
+- Google이 10-50% 부하에서 주로 운영 → idle 전력이 OPEX에 큰 영향 → Energy Proportionality 문제와 직결
+
+이것이 Ch1의 Power Wall, SPECpower 벤치마크, Energy Proportionality 논의와 직결된다.
+
+```
+perf/TCO ↑ 전략:
+  ├─ perf ↑: 더 빠른 프로세서, 병렬화, 캐시 최적화
+  └─ TCO ↓:
+      ├─ CAPEX ↓: 저렴한 HW, 효율적 설계
+      └─ OPEX ↓: 저전력(P=CV²f↓), 효율적 냉각, 자동화
+```
 
 ### Chapter 2: Instructions — Language of the Computer
 
