@@ -1,6 +1,6 @@
 # 컴파일러 Knowledge
 
-> 삼성DS 시스템 전문가 과정 — 컴파일러 (문수묵 교수) | 마지막 업데이트: Ch1~6
+> 삼성DS 시스템 전문가 과정 — 컴파일러 (문수묵 교수) | 마지막 업데이트: Ch1~7
 
 ---
 
@@ -1401,7 +1401,84 @@ Preheader = 루프 헤더 앞 새 BB. LICM 코드 삽입점.
 
 **[예시문제]** 8→7이 back edge인지: 7 dom 8? 8의 dom={1,2,7,8}, 7∈dom → YES!
 
+---
+
+### Ch7. Loop Optimizations — LICM + Strength Reduction
+
+#### 7-1. LICM (Loop Invariant Code Motion)
+
+```
+Loop invariant: 루프 안에서 값이 변하지 않는 계산
+  → preheader로 이동하면 반복 횟수만큼 절감!
+
+탐지 (RD 사용, 반복):
+  A=B+C가 invariant ⟺
+    B의 모든 reaching defs가 루프 밖 or
+    루프 안 def 1개이고 이미 invariant
+  (C도 동일) → 변화 없을 때까지 반복
+
+Code Motion 3조건:
+  (1) BB가 루프 모든 exit을 dominate
+  (2) 같은 변수의 다른 def가 루프 안에 없음
+  (3) A의 모든 use가 해당 def에 dominate됨
+```
+
+**[예시문제]** invariant `A=B+C`를 preheader로 옮겨도 안전한 조건은?
+
+**[풀이]**: (1) A=B+C가 있는 BB가 루프 exit을 dominate (2) 루프 안에 A의 다른 정의 없음 (3) A를 사용하는 모든 곳이 이 def에 dominate됨. 셋 다 충족해야 이동 가능.
+
+#### 7-2. Strength Reduction
+
+```
+BIV: X = X ± c (루프 내 유일한 정의)
+IV: A = c1 × BIV + c2
+
+SR: 1. 새 A' 생성
+    2. Preheader: A' = c1×B+c2
+    3. B 변경 뒤: A' = A'+x×c1 (곱셈→덧셈!)
+    4. A = A'
+
+LFTR: 루프 조건을 IV 기반으로 교체 → BIV 제거
+Non-trivial BIV: 정의 여러 개여도 각 def 뒤에 IV 업데이트 추가
+```
+
+**[예시문제]** `for(i=0;i<100;i++) { t1=4*i; t2=&A+t1; *t2=0; }`에 SR 적용.
+
+**[풀이]**:
+```
+BIV i, IV t1=4i, t2=4i+&A
+preheader: t2'=&A, t3=&A+400
+loop: if(t2'>=t3) goto L1; *t2'=0; t2'+=4; goto loop
+→ 곱셈 제거, i 제거, 루프 3명령어
+```
+
 ## ⑤ 시험 대비 체크리스트
+
+### 계산 문제 유형
+- [ ] 실행 시간 계산, Speedup
+- [ ] GEN/KILL(RD), USE/DEF(LV), GEN/KILL(AE) 계산
+- [ ] RD/LV/AE 반복 계산 (수렴까지)
+- [ ] Dominator 계산
+- [ ] Back edge 판별, Natural loop 구성
+- [ ] Loop invariant 탐지 (RD 기반, 반복)
+- [ ] Code motion 가능 여부 (3조건)
+- [ ] Strength Reduction 적용 (BIV/IV → 곱셈→덧셈)
+- [ ] IV Elimination + LFTR
+- [ ] SSA 변환 + φ-function
+- [ ] 간섭 그래프 컬러링
+- [ ] BB 내 지역 최적화
+- [ ] 격자 다이어그램, rPostOrder
+
+### 개념 문제 유형
+- [ ] Forward vs Backward, union vs intersection
+- [ ] KILL 정적 속성, 경계조건 vs 초기화
+- [ ] 단조성/분배성과 수렴/정밀도
+- [ ] RD(∪)와 AE(∩) 초기화 차이
+- [ ] Available vs Anticipated, PRE safety
+- [ ] Dominator/Back edge/Reducible flow graph
+- [ ] LICM 3조건, Landing pad
+- [ ] BIV/IV/Family, SR 알고리즘, LFTR
+- [ ] Non-trivial BIV SR
 
 ### 계산 문제 유형
 - [ ] 실행 시간 계산 (IC × CPI × CT) 및 Speedup
