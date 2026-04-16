@@ -24,6 +24,9 @@
 | **[Ch3] Even Parity** | ep = ^x | XOR reduction, 모든 비트 XOR |
 | **[Ch3] All-Zero** | zero = ~(\|x) | OR reduction 후 NOT |
 | **[Ch3] All-One** | one = &x | AND reduction |
+| **[Ch4] D FF** | always @(posedge CLK) Q <= D; | nonblocking, rising edge에서 D→Q |
+| **[Ch4] D Latch** | always @(CLK,D) if(CLK) Q<=D; | CLK=1이면 transparent, 아니면 latch |
+| **[Ch4] Counter** | always @(negedge clk or posedge clr) | 비동기 리셋 + negedge 카운트 |
 
 ---
 
@@ -48,6 +51,11 @@
 | **Logical vs Bitwise operator [Ch3]** | !,&&,\|\| : 전체→1비트 true/false | ~,&,\|,^ : 비트별 연산 |
 | **Reduction vs Bitwise [Ch3]** | 단항, 벡터→스칼라 (&x, \|x, ^x) | 이항, 비트별 연산 (a&b, a\|b) |
 | **signed vs unsigned 비교 [Ch3]** | 둘 다 signed→sign extension+signed 비교 | 한쪽이라도 unsigned→zero-pad+unsigned 비교 |
+| **Blocking vs Nonblocking [Ch4]** | = : 순서대로, 즉시 할당, 조합논리용 | <= : RHS 동시 평가, 블록 끝 할당, 순차논리용 |
+| **initial vs always [Ch4]** | 시뮬레이션 중 1회만, 합성불가(ASIC) | 이벤트마다 반복, 합성 가능 |
+| **Latch vs Flip-Flop 합성 [Ch4]** | always@(CLK,D) + if(CLK) → latch | always@(posedge CLK) → flip-flop |
+| **Inter vs Intra-assignment delay [Ch4]** | #10 a=b; 문장 전체 지연 | a=#10 b; RHS 즉시평가, 할당만 지연 |
+| **case vs casex vs casez [Ch4]** | 0,1,x,z 정확 비교 | casex: x,z don't care / casez: z don't care |
 
 ---
 
@@ -116,6 +124,22 @@
 | Replication | {n{expr}}; 반복 concatenation [Ch3] |
 | Transport delay | 와이어 지연 모델, net delay 기본, 모든 변화 전파 [Ch3] |
 | Vector | 다중 비트 신호 묶음(bus), [msb:lsb] 또는 [lsb:msb] 선언 [Ch3] |
+| Blocking assignment | = ; 순서대로 실행, 즉시 할당, 조합논리 always 블록에서 사용 [Ch4] |
+| case/casex/casez | 다중 분기 선택문; casex: x,z don't care, casez: z don't care [Ch4] |
+| forever | 무한 반복 루프, $finish 또는 disable로만 종료, timing control 필수 [Ch4] |
+| for loop | init; condition; update 형태의 반복, 합성 시 unroll됨 [Ch4] |
+| initial block | 시뮬레이션 1회 실행, 변수 초기화/테스트벤치용, ASIC 합성 불가 [Ch4] |
+| Inter-assignment delay | #delay 문장 앞; 문장 전체 실행을 지연 [Ch4] |
+| Intra-assignment delay | 할당 RHS에 #delay; RHS 즉시 평가, 할당만 지연 [Ch4] |
+| Named event | event 타입 선언, ->로 트리거, @로 인식; 핸드셰이킹 용도 [Ch4] |
+| negedge | 신호의 하강 에지(1→0), @(negedge clk)으로 사용 [Ch4] |
+| Nonblocking assignment | <= ; RHS 동시 평가, 블록 끝 할당, 순차논리 always에서 사용 [Ch4] |
+| posedge | 신호의 상승 에지(0→1), @(posedge clk)으로 사용 [Ch4] |
+| Race condition | 여러 always에서 같은 신호를 blocking으로 할당 시 순서 의존 버그 [Ch4] |
+| repeat | 고정 횟수 반복 루프, counter_expr는 시작 전 1회 평가 [Ch4] |
+| Unwanted latch | 조합논리 always에서 if에 else 없거나 case에 default 없을 때 합성되는 의도치 않은 latch [Ch4] |
+| wait | 레벨 감지 이벤트 제어, 조건이 true될 때까지 대기 [Ch4] |
+| while loop | 조건이 false가 될 때까지 반복, 처음부터 false면 미실행 [Ch4] |
 
 ---
 
@@ -320,6 +344,31 @@ module full_adder_behavioral(input x, y, c_in,
 endmodule
 ```
 
+**합성 회로도 (세 가지 모두 동일한 하드웨어로 합성):**
+
+```
+  Full Adder 합성 결과:
+
+  x ──→┤ XOR ├─→ s1 ──→┤ XOR ├─→ sum
+  y ──→┤     │          │     │
+       └─────┘   c_in──→┤     │
+                        └─────┘
+  x ──→┤ AND ├─→ c1 ──→┤     │
+  y ──→┤     │          │ OR  ├─→ c_out
+       └─────┘          │     │
+  c_in─→┤ AND ├─→ c2 ──→┤     │
+  s1 ──→┤     │          └─────┘
+        └─────┘
+
+  또는 간단히:
+  x ──→┤ Half  ├─s1──→┤ Half  ├──→ sum
+  y ──→┤ Adder │      │ Adder │
+       │ ha_1  ├─c1─┐ │ ha_2  ├─c2─┐
+       └───────┘    │ └───────┘    │
+              c_in──┘              │
+                    └──→┤ OR ├──→ c_out ←─┘
+```
+
 **RTL = synthesizable behavioral + dataflow (업계 표준)**
 
 **숫자 표현 형식:**
@@ -450,6 +499,53 @@ assign one  = &x;       // AND reduction
 assign out = s1 ? (s0 ? i3 : i2) : (s0 ? i1 : i0);
 ```
 
+**합성 회로도:**
+
+```
+  [4-bit Adder]
+  x[3:0] ──→┤       ├──→ sum[3:0]   ({c_out, sum} = 5비트)
+  y[3:0] ──→┤  ADD  │
+  c_in   ──→┤       ├──→ c_out      (MSB = carry)
+             └───────┘
+
+  [4-bit Adder/Subtractor]
+  y[3:0]──→┤ XOR ├──→ t[3:0]──→┤       ├──→ sum[3:0]
+  c_in ──→┤{4{}}├              │  ADD  │
+           └─────┘   x[3:0]──→┤       ├──→ c_out
+                     c_in ──→─┤       │
+                              └───────┘
+  c_in=0: t=y     → x+y    (덧셈)
+  c_in=1: t=~y    → x-y    (뺄셈, 2의 보수)
+
+  [Parity Generator — 9-bit]
+  x[0]──→┤XOR├──→┤XOR├──→┤XOR├──→┤XOR├──→┤XOR├──→┤XOR├──→┤XOR├──→┤XOR├──→ ep
+  x[1]──→┤   │   │   │   │   │   │   │   │   │   │   │   │   │   │   │
+          └───┘   └───┘   └───┘   └───┘   └───┘   └───┘   └───┘   └───┘
+  x[2]──→──┘  x[3]─┘  x[4]─┘  x[5]─┘  x[6]─┘  x[7]─┘  x[8]─┘
+  ep──→┤NOT├──→ op
+
+  [All-Zero Detector]
+  x[0]──→┤OR├──→┤OR├──→...──→┤OR├──→┤NOT├──→ zero
+  x[1]──→┤  │   │  │         │  │
+         ...    ...           │  │
+  x[7]──────────────────────→┤  │
+
+  [All-One Detector]
+  x[0]──→┤AND├──→┤AND├──→...──→┤AND├──→ one
+  x[1]──→┤   │   │   │         │   │
+         ...     ...            │   │
+  x[7]─────────────────────────→┤   │
+
+  [4:1 Mux — conditional 중첩]
+  i0──→┤MUX├         ┌──→┤MUX├──→ out
+  i1──→┤2:1├──→──────┘   │2:1│
+       └───┘   s0        │   │
+  i2──→┤MUX├──→──────────┤   │
+  i3──→┤2:1│       s1───→┤   │
+       └───┘              └───┘
+       s0
+```
+
 **Shift 연산:**
 
 ```
@@ -495,6 +591,216 @@ v[7-:8]  // = v[7:0]   (base=7, 아래로 8비트)
 
 ---
 
+### [Ch4] Behavioral Modeling
+
+**Blocking vs Nonblocking — 5가지 가이드라인 (필수 암기!):**
+
+```
+1. 순차 논리: always @(posedge clk) + nonblocking (<=)
+2. 간단한 조합 논리: assign (continuous assignment)
+3. 복잡한 조합 논리: always @(*) + blocking (=)
+4. 같은 신호를 여러 always/assign에서 할당하지 마라
+5. 같은 always 블록에서 blocking과 nonblocking을 섞지 마라
+```
+
+**Blocking vs Nonblocking 동작 차이:**
+
+```verilog
+// Blocking: 순서대로, 즉시 할당
+initial begin
+  x = #5 1'b0;   // time 5
+  y = #3 1'b1;   // time 8 (5+3)
+  z = #6 1'b0;   // time 14 (8+6)
+end
+
+// Nonblocking: RHS 동시 평가, 블록 끝 할당
+initial begin
+  x <= #5 1'b0;  // time 5
+  y <= #3 1'b1;  // time 3 (동시 시작!)
+  z <= #6 1'b0;  // time 6
+end
+```
+
+**Shift Register — 핵심 예제:**
+
+```verilog
+// Blocking (잘못! FF 1개만 합성)
+always @(posedge clk) begin
+  qout[0] = sin;       // 즉시 변경
+  qout[1] = qout[0];   // sin의 새 값 사용!
+  qout[2] = qout[1];   // 역시 sin!
+  qout[3] = qout[2];   // 모두 sin! → FF 1개
+end
+
+// Nonblocking (올바름! FF 4개 체인)
+always @(posedge clk) begin
+  qout[0] <= sin;       // 모든 RHS를 이전 값으로 평가
+  qout[1] <= qout[0];   // qout[0]의 이전 값
+  qout[2] <= qout[1];
+  qout[3] <= qout[2];   // → FF 4개 체인!
+end
+// 더 좋은 표현: qout <= {qout[2:0], sin};
+```
+
+**합성 회로도 비교:**
+
+```
+  [Blocking — 잘못된 합성 (FF 1개)]
+  sin ──→┤ DFF ├──→ qout[0] ═══ qout[1] ═══ qout[2] ═══ qout[3]
+         └─────┘              (단순 wire 연결, FF 없음!)
+          clk
+  → 모든 비트가 동일 값. shift register가 아님!
+
+  [Nonblocking — 올바른 합성 (FF 4개 체인)]
+  sin──→┤DFF├──→qout[0]──→┤DFF├──→qout[1]──→┤DFF├──→qout[2]──→┤DFF├──→qout[3]
+        └───┘              └───┘              └───┘              └───┘
+                                    clk (공유)
+  → 각 비트가 이전 비트의 이전 값을 받음. 올바른 shift register!
+```
+
+**Race Condition 방지:**
+
+```verilog
+// Blocking → race! (순서 의존)
+always @(posedge clock) x = y;
+always @(posedge clock) y = x;
+
+// Nonblocking → 올바른 swap
+always @(posedge clock) x <= y;
+always @(posedge clock) y <= x;
+```
+
+**Unwanted Latch 방지:**
+
+```verilog
+// 나쁜 예: else 없음 → latch!
+always @* begin
+  if (cond1) A = val1;
+  else if (cond2) A = val2;
+  // cond1, cond2 모두 아니면? → A 유지 → latch!
+end
+
+// 올바른 예: else로 모든 경우 커버
+always @* begin
+  if (cond1) A = val1;
+  else if (cond2) A = val2;
+  else A = default_val;   // → latch 방지
+end
+```
+
+**D FF / D Latch / Combinational 비교:**
+
+```verilog
+// D Flip-Flop (순차)
+always @(posedge CLK) Q <= D;
+
+// D Latch (순차)
+always @(CLK, D) if (CLK) Q <= D;
+
+// Combinational (조합)
+always @(*) y = ~a;   // 합성: 메모리 소자 없음!
+```
+
+**합성 회로도 비교:**
+
+```
+  [D Flip-Flop — @(posedge CLK)]
+  D[3:0]──→┤ D   Q ├──→ Q[3:0]
+            │  DFF  │
+  CLK ──→──┤>      │
+            └───────┘
+  → 4개의 DFF (4-bit register)
+
+  [D Latch — @(CLK, D) if(CLK)]
+  D[3:0]──→┤ D   Q ├──→ Q[3:0]
+            │ LATCH │
+  CLK ──→──┤ EN    │
+            └───────┘
+  → 4개의 D Latch (CLK=1일 때 transparent)
+
+  [Combinational — @(*)]
+  a[3:0]──→┤ NOT ├──→ y[3:0]
+            └─────┘
+  → 인버터만! 메모리 소자 없음 (reg 타입이지만 FF/Latch 아님)
+```
+
+**Counter with 비동기 리셋:**
+
+```verilog
+always @(negedge clock or posedge clear) begin
+  if (clear) qout <= 4'd0;       // 비동기 리셋 우선
+  else       qout <= qout + 1;   // negedge에서 카운트
+end
+```
+
+**합성 회로도:**
+
+```
+                    ┌─────┐
+  qout[3:0]──→──→──┤  +  ├──→┤ 0 │
+             1──→──┤     │   │MUX├──→┤ D   Q ├──→ qout[3:0]
+                    └─────┘   │   │   │ DFF  │
+              4'd0 ─────────→┤ 1 │   │  R   │
+                              └───┘   └──────┘
+                    clear──→──┤sel│    │    │
+                              └───┘  neg   posedge
+                                     clk   clear
+  → Adder + Mux + DFF with async reset
+  → clear=1이면 즉시 리셋 (클럭 무관, 비동기)
+```
+
+**case 4:1 Mux 합성 회로도:**
+
+```verilog
+case (S)
+  2'b00: Y = I0;
+  2'b01: Y = I1;
+  2'b10: Y = I2;
+  2'b11: Y = I3;
+endcase
+```
+
+```
+  I0──→┤       ├
+  I1──→┤  4:1  ├──→ Y
+  I2──→┤  MUX  │
+  I3──→┤       │
+       └───────┘
+  S[1:0]──→┤sel│
+```
+
+casex (data)        // x,z를 don't care로
+  4'bxxx1: out = 0;  // LSB=1 → trailing zero 0개
+  4'bxx10: out = 1;
+  4'bx100: out = 2;
+  default: out = 3'b111;
+endcase
+```
+
+**Timing Control:**
+
+```
+Inter-assignment: #10 a = b;     → 10단위 후 문장 전체 실행
+Intra-assignment: a = #10 b;     → RHS 즉시 평가, 10단위 후 할당
+                  a <= #10 b;    → RHS 즉시 평가, 10단위 후 할당 (다른 문장 차단 안 함)
+```
+
+**Loop:**
+
+```verilog
+// for — 합성 시 unroll
+for (i=0; i<=7; i=i+1)
+  if (data[i]==0) out = out + 1;
+
+// repeat — 고정 횟수
+repeat (32) begin state[i]=0; i=i+1; end
+
+// forever — 클럭 생성
+forever begin #10 clock<=1; #5 clock<=0; end
+```
+
+---
+
 ## ⑤ 시험 대비 체크리스트
 
 ### 계산 문제 유형
@@ -507,6 +813,8 @@ v[7-:8]  // = v[7:0]   (base=7, 아래로 8비트)
 - [ ] Signed/unsigned 비교 결과 판별 (mixed operand 시 unsigned로 비교) [Ch3]
 - [ ] Reduction operator 결과 계산 (^x, &x, |x) [Ch3]
 - [ ] Shift 연산 결과 (logical vs arithmetic, 부호비트 처리) [Ch3]
+- [ ] Blocking vs Nonblocking 결과 차이 (shift register, counter+finish 예제) [Ch4]
+- [ ] Inter vs Intra-assignment delay 결과 차이 (blocking/nonblocking 각각) [Ch4]
 
 ### 개념 문제 유형
 - [ ] wire vs reg 차이, 언제 어떤 것을 사용하는가
@@ -525,3 +833,10 @@ v[7-:8]  // = v[7:0]   (base=7, 아래로 8비트)
 - [ ] Concatenation/Replication으로 adder/subtractor 구현 원리 [Ch3]
 - [ ] Vector endianness, variable part-select 문법 [Ch3]
 - [ ] Array/Memory 접근 제약 (단일 word만 할당 가능) [Ch3]
+- [ ] Blocking vs Nonblocking 5가지 가이드라인 [Ch4]
+- [ ] Race condition과 nonblocking으로 해결하는 원리 [Ch4]
+- [ ] Unwanted latch 방지 (if→else, case→default 필수) [Ch4]
+- [ ] initial의 합성 가능 여부 (ASIC 불가, FPGA 가능) [Ch4]
+- [ ] always @(posedge) vs @(*) 의미와 합성 결과 차이 (FF vs 조합) [Ch4]
+- [ ] casex/casez의 don't care 처리 방식 [Ch4]
+- [ ] 비동기 리셋: always @(posedge clk or posedge reset) 패턴 [Ch4]
