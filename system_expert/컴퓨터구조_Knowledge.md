@@ -1,7 +1,7 @@
 # 컴퓨터구조 Knowledge
 
 > 삼성DS · COD (Computer Organization & Design) RISC-V
-> 최종 업데이트: 2026-04-15 · Ch1~Ch4
+> 최종 업데이트: 2026-04-15 · Ch1~Ch5
 
 ---
 
@@ -31,6 +31,13 @@
 | `Double range: ±2.2×10⁻³⁰⁸ ~ ±1.8×10³⁰⁸` | 배정밀도 범위 | 정밀도 ~16자리 십진수 (2⁻⁵²) | Exp 11bit, Frac 52bit |
 | `Speedup_pipeline ≈ Stages` (이상적) | 파이프라인 이상적 속도 향상 | Stages=파이프라인 단계 수 | 균형 잡힌 경우. 불균형 시 더 적음 |
 | `IPC = 1/CPI` | 사이클당 명령어 수 | Multiple issue에서 CPI<1일 때 사용 | peak IPC=issue width |
+| `AMAT = Hit time + Miss rate × Miss penalty` | 평균 메모리 접근 시간 | | 캐시 성능 평가 핵심 |
+| `Mem stall = IC × (Misses/Inst) × Miss penalty` | 메모리 stall 사이클 | I-cache + D-cache 별도 | |
+| `CPI_actual = CPI_base + Mem_stall/Inst` | 실제 CPI | 캐시 miss 반영 | |
+| `MTBF = MTTF + MTTR` | 평균 고장 간격 | | |
+| `Availability = MTTF / (MTTF+MTTR)` | 가용성 | 1에 가까울수록 좋음 | |
+| `Set index = Block_addr mod Num_sets` | Set-assoc 인덱스 | Direct: Num_sets=Num_blocks | |
+| `Block_addr = floor(Byte_addr / Block_size)` | 블록 주소 | Offset = Byte_addr mod Block_size | |
 
 ---
 
@@ -65,6 +72,14 @@
 | In-order vs Out-of-order | 프로그램 순서대로 실행 (A53) | 의존성 없으면 먼저 실행 (i7) | OoO: 성능↑ 전력↑ 복잡도↑ |
 | Exception vs Interrupt | CPU 내부 발생(opcode,overflow,syscall) | 외부 I/O 컨트롤러 | 처리 메커니즘 유사: SEPC/SCAUSE 저장→handler |
 | ARM A53 vs Intel i7 | PMD, 100mW, 8-stage in-order | Server, 130W, 14-stage OoO+speculation | 전력효율 vs 절대성능 |
+| Write-Through vs Write-Back | 캐시+메모리 동시 갱신 | 캐시만 갱신, dirty시 교체때 쓰기 | WT: write buffer 필요. WB: dirty bit. VM은 WB만 |
+| Direct Mapped vs Set-Assoc vs Fully | 1곳/n곳/어디든 | 비교기 1/n/전체 | 연관도↑→conflict miss↓ but access time↑ |
+| SRAM vs DRAM vs Flash vs Disk | 0.5ns,$5K/GB / 50ns,$6/GB / 50µs,$0.75/GB / 10ms,$0.07/GB | | 메모리 계층 물리적 기반 |
+| Temporal vs Spatial locality | 최근 접근→곧 재접근 | 인접 데이터→곧 접근 | 캐시의 시간적/공간적 활용 근거 |
+| L1 vs L2 cache | 작고 빠름(hit time 최소화) | 크고 느림(miss rate 최소화) | L1=latency reducer, L2=BW amplifier |
+| Compulsory vs Capacity vs Conflict | 첫 접근 / 캐시 용량 부족 / set 내 충돌 | | 3C's of cache misses |
+| Page Table vs TLB | 메모리의 전체 매핑 테이블 | CPU 내 PTE 캐시(16~512) | TLB hit 0.5~1cy, miss 10~100cy |
+| Snooping vs Directory coherence | 모든 캐시가 버스 감시 | 공유 상태를 디렉토리 기록 | Snooping: 소규모. Directory: 대규모 |
 
 ---
 
@@ -75,8 +90,10 @@
 | ABI | ISA + 시스템SW 인터페이스. 같은 ISA라도 OS 다르면 ABI 다를 수 있음 |
 | Abstraction | 하위 세부사항을 숨기고 단순 인터페이스만 노출하는 설계 원칙 |
 | Amdahl's Law | 부분 개선이 전체 성능에 비례하지 않음. T=T_affected/n + T_unaffected |
+| AMAT | Average Memory Access Time = Hit time + Miss rate × Miss penalty |
 | Basic Block | 중간에 분기 없고 분기대상도 처음뿐인 명령어 시퀀스. 최적화 기본 단위 |
 | Cache Memory | CPU 내/근처 소형 고속 SRAM. 메인메모리 접근 지연 감소 |
+| Cache Coherence | 멀티프로세서 공유 데이터 일관성. Snooping(버스 감시)/Directory(상태 기록) |
 | CAPEX (Capital Expenditure) | 자본적 지출. 서버·장비·인프라 등 초기 구매/구축 비용. 일회성 투자 |
 | CISC | 복잡·다양·가변길이 명령어. x86 대표 |
 | CPI | 명령어당 평균 클럭 사이클. CPU HW와 명령어 mix에 의해 결정 |
@@ -97,6 +114,7 @@
 | ILP (Instruction-Level Parallelism) | 파이프라인/다중 발행으로 여러 명령어를 동시 실행하는 병렬성 |
 | IPC (Instructions Per Cycle) | 사이클당 명령어 수. CPI<1일 때(multiple issue) 사용. IPC=1/CPI |
 | Little Endian | 최하위 바이트가 가장 낮은 주소. RISC-V 사용 |
+| Locality | Temporal(최근→재접근) + Spatial(인접→접근). 메모리 계층의 이론적 근거 |
 | lr.d / sc.d | Load Reserved / Store Conditional. 동기화용 atomic 쌍 |
 | lui | 20-bit 상수를 rd[31:12]에 로드, sign extend, [11:0]=0 |
 | Moore's Law | IC 트랜지스터 수 약 2년마다 2배. 경험적 관찰(물리법칙 아님) |
@@ -113,6 +131,8 @@
 | Sign Extension | 넓은 비트 확장 시 부호비트 복제. lb(sign), lbu(zero) |
 | SPEC | Standard Performance Evaluation Corp. 기하평균 벤치마크 |
 | Stored Program | 명령어도 이진수로 메모리 저장. 프로그램이 프로그램 조작 가능 |
+| TLB (Translation Lookaside Buffer) | CPU 내 PTE 캐시. 주소 변환 가속. hit 0.5~1cy, miss 10~100cy |
+| Virtual Memory | 메인메모리를 디스크의 캐시로 사용. 프로그램별 가상 주소 공간, 보호, Page Table로 변환 |
 | Superscalar | Dynamic multiple issue. CPU가 런타임에 사이클당 여러 명령어 발행. OoO 실행 가능 |
 | Speculation | 분기 결과 등을 예측하여 미리 실행. 맞으면 commit, 틀리면 flush+rollback |
 | TCO (Total Cost of Ownership) | 총 소유 비용 = CAPEX + OPEX. 시스템의 전체 수명 동안 발생하는 모든 비용. 성능 평가 시 단순 구매가가 아닌 TCO 기준이 실질적 |
@@ -205,6 +225,20 @@ perf/TCO ↑ 전략:
 
 **Dual-issue scheduling**: IPC=5/4=1.25. Loop unrolling(4×) 후 IPC=14/8=1.75
 
+### Chapter 5: Large and Fast — Exploiting Memory Hierarchy
+
+(이전 채팅에서 상세 정리 완료 — 109 slides 전체 반영)
+
+핵심 토픽: Locality(Temporal/Spatial), 메모리 계층(SRAM→DRAM→Flash→Disk, 속도·가격·용량 트레이드오프), Memory Wall(DRAM latency 감소 느림), Direct Mapped/Set-Associative/Fully Associative 캐시, Tag/Valid bit/Index/Offset 주소 분할, Block size 트레이드오프, Write-Through(write buffer)/Write-Back(dirty bit), Write Allocation, AMAT=Hit time+Miss rate×Miss penalty, Miss 3C's(Compulsory/Capacity/Conflict), Cache design trade-offs(크기/연관도/블록크기), Multilevel cache(L1 latency reducer/L2 BW amplifier), LRU/Random replacement, Dependability(MTTF/MTTR/MTBF/Availability), Hamming SEC/DEC(ECC DRAM), Virtual Machines(VMM), Virtual Memory(Page/Page fault/Page Table/TLB), Address Translation(가상→물리), Memory Protection(supervisor mode), Cache Coherence(Snooping invalidate/Directory), Memory Consistency, SW optimization(blocking/tiling)
+
+**AMAT 예시**: 1ns clock, hit=1cy, penalty=20cy, miss=5% → AMAT = 1+0.05×20 = 2ns
+
+**Cache perf 예시**: I-miss=2%, D-miss=4%, penalty=100cy, base CPI=2, 36% ld/st → stall=2+1.44=3.44 → actual CPI=5.44
+
+**Multilevel 예시**: L1만: CPI=1+0.02×400=9. L2 추가(5ns,0.5% global miss): CPI=1+0.02×20+0.005×400=3.4 → 2.6× 향상
+
+**3C's**: Compulsory(첫접근)→block↑/prefetch. Capacity→cache↑. Conflict→assoc↑
+
 ---
 
 ## ⑤ 시험 대비 체크리스트
@@ -290,3 +324,33 @@ perf/TCO ↑ 전략:
 - [ ] Speculation 원리와 rollback
 - [ ] RISC-V ISA가 파이프라인에 유리한 이유 (32-bit 고정, 규칙적 포맷)
 - [ ] Critical path가 clock period를 결정하는 원리
+
+### Ch5 계산
+- [ ] AMAT = Hit time + Miss rate × Miss penalty 계산
+- [ ] Memory stall cycles = IC × Misses/Inst × Miss penalty
+- [ ] Actual CPI = Base CPI + I-cache stall + D-cache stall
+- [ ] Multilevel cache CPI 계산 (L1 miss → L2 hit/miss 분리)
+- [ ] Cache 주소 분할: Tag/Index/Offset 비트 수 계산
+- [ ] Block address와 cache index 계산 (address → block → set)
+- [ ] Disk access time 계산 (seek + rotational + transfer + controller)
+- [ ] Availability = MTTF / (MTTF + MTTR)
+- [ ] Write-through CPI 영향 계산 (store 비율 × penalty)
+
+### Ch5 개념
+- [ ] Temporal vs Spatial locality 정의와 예시
+- [ ] 메모리 계층: SRAM→DRAM→Flash→Disk 속도/가격/용량
+- [ ] Memory Wall: DRAM latency 감소가 느린 문제
+- [ ] Direct mapped / n-way set associative / fully associative 차이
+- [ ] Tag, Valid bit, Index, Offset의 역할
+- [ ] Block size 트레이드오프 (spatial locality vs miss penalty vs pollution)
+- [ ] Write-Through vs Write-Back (장단점, write buffer, dirty bit)
+- [ ] Miss 3C's: Compulsory/Capacity/Conflict 원인과 해결
+- [ ] LRU vs Random replacement
+- [ ] Multilevel cache: L1(latency) vs L2(miss rate) 설계 목표 차이
+- [ ] Virtual Memory: page, page fault, page table, fully assoc, write-back only
+- [ ] TLB: PTE 캐시, hit/miss 시 동작
+- [ ] Page fault handler 동작 순서
+- [ ] Memory Protection: supervisor mode, 특권 명령어
+- [ ] Cache Coherence: Snooping invalidate protocol 동작
+- [ ] Hamming SEC/DEC: ECC DRAM (64bit당 8bit 보호)
+- [ ] SW optimization: cache blocking(tiling)으로 temporal locality 극대화
