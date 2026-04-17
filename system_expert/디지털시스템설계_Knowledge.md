@@ -27,6 +27,9 @@
 | **[Ch4] D FF** | always @(posedge CLK) Q <= D; | nonblocking, rising edge에서 D→Q |
 | **[Ch4] D Latch** | always @(CLK,D) if(CLK) Q<=D; | CLK=1이면 transparent, 아니면 latch |
 | **[Ch4] Counter** | always @(negedge clk or posedge clr) | 비동기 리셋 + negedge 카운트 |
+| **[Ch5] Hazard 제거** | f = xy + x̅z + yz | 중복 항(yz) 추가로 static-1 hazard 제거 |
+| **[Ch5] Gate delay** | #(t_rise, t_fall, t_off) | rise:→1, fall:→0, turn-off:→z |
+| **[Ch5] Missing turn-off** | t_off = min(t_rise, t_fall) | 2개만 지정 시 |
 
 ---
 
@@ -56,6 +59,9 @@
 | **Latch vs Flip-Flop 합성 [Ch4]** | always@(CLK,D) + if(CLK) → latch | always@(posedge CLK) → flip-flop |
 | **Inter vs Intra-assignment delay [Ch4]** | #10 a=b; 문장 전체 지연 | a=#10 b; RHS 즉시평가, 할당만 지연 |
 | **case vs casex vs casez [Ch4]** | 0,1,x,z 정확 비교 | casex: x,z don't care / casez: z don't care |
+| **wire vs wand vs wor [Ch5]** | wire: 충돌→x | wand: 하나가 0→0 / wor: 하나가 1→1 |
+| **Static vs Dynamic hazard [Ch5]** | 출력 일정해야 하는데 잠깐 반대 값 | 한 번 변해야 하는데 3+회 변함 (경로 3+개) |
+| **Gate(inertial) vs Wire(transport) delay [Ch5]** | 짧은 펄스 무시, 게이트 모델 | 모든 변화 전파, 와이어 모델 |
 
 ---
 
@@ -140,6 +146,18 @@
 | Unwanted latch | 조합논리 always에서 if에 else 없거나 case에 default 없을 때 합성되는 의도치 않은 latch [Ch4] |
 | wait | 레벨 감지 이벤트 제어, 조건이 true될 때까지 대기 [Ch4] |
 | while loop | 조건이 false가 될 때까지 반복, 처음부터 false면 미실행 [Ch4] |
+| bufif0/bufif1 | tri-state 버퍼, control에 따라 활성/z 출력 [Ch5] |
+| Dynamic hazard | 출력이 3+회 변하는 현상, 경로 3+개 필요 [Ch5] |
+| Fall delay | 1/x/z → 0 전이 지연 [Ch5] |
+| Gate primitive | Verilog 내장 14종 게이트 (and/or/xor/nand/nor/xnor/buf/not/bufif/notif) [Ch5] |
+| Glitch | 해저드에 의한 원치 않는 짧은 펄스 [Ch5] |
+| Hazard | 경로별 지연 차이로 인한 출력 불안정 현상 [Ch5] |
+| Rise delay | 0/x/z → 1 전이 지연 [Ch5] |
+| Static hazard | 출력이 일정해야 하는데 잠깐 반대 값으로 갔다가 복귀 [Ch5] |
+| tri/tri0/tri1 | tri: wire와 동일, tri0: 미구동 시 0, tri1: 미구동 시 1 [Ch5] |
+| Turn-off delay | 0/1/x → z 전이 지연 (tri-state 게이트용) [Ch5] |
+| UDP | User-Defined Primitive, 모듈과 유사하나 다른 UDP/모듈 인스턴스화 불가 [Ch5] |
+| wand/wor | wired net, wand: 하나가 0→0, wor: 하나가 1→1 [Ch5] |
 
 ---
 
@@ -801,6 +819,83 @@ forever begin #10 clock<=1; #5 clock<=0; end
 
 ---
 
+### [Ch5] Structural Modeling
+
+**14 Gate Primitives:**
+
+```
+and/or/xor/nand/nor/xnor: 다입력 단출력
+  gate_name [inst] (output, in1, in2, ..., inN);
+
+buf/not: 단입력 다출력
+  gate_name [inst] (out1, out2, ..., outN, input);
+
+bufif0/bufif1/notif0/notif1: tri-state (출력, 입력, control)
+  gate_name [inst] (output, input, control);
+```
+
+**Net Type Resolution (다중 드라이버):**
+
+```
+  wire/tri │ 0  1  x  z     wand │ 0  1  x  z     wor │ 0  1  x  z
+  ─────────┼────────────     ─────┼────────────     ────┼────────────
+     0     │ 0  x  x  0       0  │ 0  0  0  0       0 │ 0  1  x  0
+     1     │ x  1  x  1       1  │ 0  1  x  1       1 │ 1  1  1  1
+     x     │ x  x  x  x       x  │ 0  x  x  x       x │ x  1  x  x
+     z     │ 0  1  x  z       z  │ 0  1  x  z       z │ 0  1  x  z
+
+  tri0: z+z→0 (pull-down)    tri1: z+z→1 (pull-up)
+```
+
+**Gate Delay 지정:**
+
+```verilog
+and #(5) a1(b,x,y);                    // 단일 (모든 전이 동일)
+and #(t_rise, t_fall) a2(c,a,z);       // rise/fall
+or  #(t_rise, t_fall, t_off) o1(f,b,c); // rise/fall/turn-off
+// min:typ:max 형식 가능: #(10:12:15, 12:15:20)
+// 생략: 값없음→0, 1개→모두동일, 2개→t_off=min(rise,fall)
+```
+
+**Delay 계산 테이블 (발췌):**
+
+```
+  0→1: rise delay    1→0: fall delay    x→z: turn-off delay
+  0→x: min(rise,fall)  (3개 지정 시: min(r,f,off))
+  0→z: turn-off      (2개 지정 시: min(rise,fall))
+```
+
+**Hazard:**
+
+```
+  Static-1 hazard: 출력 1이어야 하는데 잠깐 0 glitch
+  Static-0 hazard: 출력 0이어야 하는데 잠깐 1 glitch
+  Dynamic hazard: 3+회 변동, 경로 3+개 필요
+
+  K-Map에서 발견: 인접한 1이 같은 루프에 없으면 hazard
+  제거: 중복 항 추가 (redundant term)
+
+  예: f = xy + x̅z → hazard
+      f = xy + x̅z + yz → hazard 제거 (yz가 전이 구간 커버)
+```
+
+**Static Hazard 예제 회로:**
+
+```
+  x──→┤AND├──→a──→┤    │
+  y──→┤#5 │       │ OR ├──→f   f = xy + x̅z
+      └───┘       │#5  │
+  x──→┤NOT├──→c─┐ │    │   y=1,z=1에서 x: 1→0
+      │#5 │     │ └────┘   a 경로: 5ns, b 경로: 10ns
+      └───┘     │          → a가 먼저 0 → f 잠깐 0 (glitch!)
+  z──────────┤AND├──→b──→┘
+             │#5 │
+      c──→───┤   │
+             └───┘
+```
+
+---
+
 ## ⑤ 시험 대비 체크리스트
 
 ### 계산 문제 유형
@@ -840,3 +935,10 @@ forever begin #10 clock<=1; #5 clock<=0; end
 - [ ] always @(posedge) vs @(*) 의미와 합성 결과 차이 (FF vs 조합) [Ch4]
 - [ ] casex/casez의 don't care 처리 방식 [Ch4]
 - [ ] 비동기 리셋: always @(posedge clk or posedge reset) 패턴 [Ch4]
+- [ ] Gate delay 지정: rise/fall/turn-off, min:typ:max, 생략 규칙 [Ch5]
+- [ ] Delay 계산 테이블 (특정 전이의 지연 값 결정) [Ch5]
+- [ ] Static hazard 발견 (K-Map에서 인접 1이 다른 루프) 및 제거 (중복 항 추가) [Ch5]
+- [ ] Dynamic hazard 조건 (경로 3+개) [Ch5]
+- [ ] Net type resolution: wire/wand/wor/tri0/tri1 다중 드라이버 결과 [Ch5]
+- [ ] Tri-state 버퍼(bufif/notif) 동작과 bus 구현 [Ch5]
+- [ ] Inertial vs Transport delay 차이와 파형 영향 [Ch5]
