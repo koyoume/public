@@ -30,6 +30,8 @@
 | **[Ch5] Hazard 제거** | f = xy + x̅z + yz | 중복 항(yz) 추가로 static-1 hazard 제거 |
 | **[Ch5] Gate delay** | #(t_rise, t_fall, t_off) | rise:→1, fall:→0, turn-off:→z |
 | **[Ch5] Missing turn-off** | t_off = min(t_rise, t_fall) | 2개만 지정 시 |
+| **[Ch6] Function** | function [3:0] func(input [7:0] d); | 단일 반환, 조합논리 전용, 타이밍 불가 |
+| **[Ch6] Task** | task name(input d, output count); | 여러 반환, 타이밍 가능 |
 
 ---
 
@@ -62,6 +64,9 @@
 | **wire vs wand vs wor [Ch5]** | wire: 충돌→x | wand: 하나가 0→0 / wor: 하나가 1→1 |
 | **Static vs Dynamic hazard [Ch5]** | 출력 일정해야 하는데 잠깐 반대 값 | 한 번 변해야 하는데 3+회 변함 (경로 3+개) |
 | **Gate(inertial) vs Wire(transport) delay [Ch5]** | 짧은 펄스 무시, 게이트 모델 | 모든 변화 전파, 와이어 모델 |
+| **Function vs Task [Ch6]** | input만, 단일 반환, 타이밍 불가, 조합 전용 | in/out/inout, 여러 반환, 타이밍 가능, 범용 |
+| **Static vs Automatic (Verilog) [Ch6]** | 기본값, 이전 호출 값 유지, 동시실행 위험 | 호출마다 새 할당, 재귀/동시 안전 |
+| **Combinational vs Sequential UDP [Ch6]** | 출력=f(현재입력), reg 아님 | 출력=reg, 상태 테이블, initial 가능 |
 
 ---
 
@@ -942,3 +947,9 @@ or  #(t_rise, t_fall, t_off) o1(f,b,c); // rise/fall/turn-off
 - [ ] Net type resolution: wire/wand/wor/tri0/tri1 다중 드라이버 결과 [Ch5]
 - [ ] Tri-state 버퍼(bufif/notif) 동작과 bus 구현 [Ch5]
 - [ ] Inertial vs Transport delay 차이와 파형 영향 [Ch5]
+- [ ] Function vs Task 차이 (인자, 반환, 타이밍, 호출 규칙) [Ch6]
+- [ ] Static vs Automatic function/task 동작 차이 [Ch6]
+- [ ] Constant function의 elaboration time 평가 개념 [Ch6]
+- [ ] UDP 규칙: scalar만, 출력 1개, z 불가, 합성 불가 [Ch6]
+- [ ] Sequential UDP 테이블 형식 (input : current_state : next_state) [Ch6]
+- [ ] UDP shorthand symbols (?, b, -, r, f, p, n, *) [Ch6]
