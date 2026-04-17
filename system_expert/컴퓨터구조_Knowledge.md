@@ -1,7 +1,7 @@
 # 컴퓨터구조 Knowledge
 
 > 삼성DS · COD (Computer Organization & Design) RISC-V
-> 최종 업데이트: 2026-04-15 · Ch1~Ch5
+> 최종 업데이트: 2026-04-15 · Ch1~Ch6
 
 ---
 
@@ -38,6 +38,8 @@
 | `Availability = MTTF / (MTTF+MTTR)` | 가용성 | 1에 가까울수록 좋음 | |
 | `Set index = Block_addr mod Num_sets` | Set-assoc 인덱스 | Direct: Num_sets=Num_blocks | |
 | `Block_addr = floor(Byte_addr / Block_size)` | 블록 주소 | Offset = Byte_addr mod Block_size | |
+| `Speedup_parallel = 1/((1-F)+F/N)` | Amdahl 병렬 버전 | F=병렬화 비율, N=프로세서 수 | F→1이어야 고속화 |
+| `Attainable GFLOP = Min(BW×AI, Peak)` | Roofline 모델 | BW=메모리대역폭, AI=FLOPs/Byte | AI 낮으면 memory bound |
 
 ---
 
@@ -80,6 +82,14 @@
 | Compulsory vs Capacity vs Conflict | 첫 접근 / 캐시 용량 부족 / set 내 충돌 | | 3C's of cache misses |
 | Page Table vs TLB | 메모리의 전체 매핑 테이블 | CPU 내 PTE 캐시(16~512) | TLB hit 0.5~1cy, miss 10~100cy |
 | Snooping vs Directory coherence | 모든 캐시가 버스 감시 | 공유 상태를 디렉토리 기록 | Snooping: 소규모. Directory: 대규모 |
+| Strong vs Weak scaling | 문제 크기 고정, 프로세서↑ | 문제도 프로세서에 비례↑ | Strong: 순차부분이 한계. Weak: 일정 성능 유지 가능 |
+| Fine-grain vs Coarse-grain MT | 매 사이클 스레드 전환 | 긴 stall(L2 miss)에서만 전환 | Fine: 짧은 stall 숨김. Coarse: HW 간단 |
+| SMT vs Coarse-grain MT | 같은 사이클에 여러 스레드 혼합 | stall 시만 전환 | SMT: issue slot 활용↑(Intel HT). Coarse: HW 간단 |
+| Shared Memory vs Message Passing | 공유 물리 주소 공간, lock 동기화 | 독립 주소 공간, send/receive | SMP: 프로그래밍 쉬움. MP: 확장성 좋음 |
+| UMA vs NUMA | 모든 프로세서 메모리 접근 동일 | 로컬이 더 빠름 | NUMA: 대규모 시스템. Memory affinity 중요 |
+| CPU vs GPU | 큰 캐시, coherent, 다양한 워크로드 | 작은 캐시, 대규모 스레드, 높은 BW | GPU: data-parallel에 강점. CPU: 순차+분기에 강점 |
+| Vector vs SIMD(SSE/AVX) | 가변 폭, strided 접근, 컴파일러 친화 | 고정 폭(128/256b), stride 미지원 | Vector가 더 일반적, SIMD는 ad-hoc |
+| Memory bound vs Compute bound | AI < 교차점 (메모리 BW 제한) | AI > 교차점 (FP 성능 제한) | Roofline 모델로 판별. 최적화 방향이 다름 |
 
 ---
 
@@ -106,6 +116,7 @@
 | Dynamic Linking | 호출 시점에만 라이브러리 로드. Lazy Linkage |
 | Exception | CPU 내부에서 발생하는 예외(undefined opcode, overflow, syscall). SEPC/SCAUSE에 기록 후 handler로 점프 |
 | Forwarding (Bypassing) | 파이프라인에서 결과가 나오면 레지스터 write 전에 바로 다음 명령어 입력으로 전달. Data hazard 해결 |
+| GPU (Graphics Processing Unit) | 대규모 병렬 데이터 처리 프로세서. 수천 스레드, 높은 메모리 BW. CUDA/OpenCL로 GPGPU 활용 |
 | Hazard | 파이프라인에서 다음 명령어를 즉시 시작하지 못하게 하는 상황. Structural/Data/Control 3종류 |
 | IC (Instruction Count) | 프로그램 실행 시 총 명령어 수 |
 | IEEE 754 | 부동소수점 표현 및 연산의 국제 표준. Single(32-bit), Double(64-bit). Bias, hidden bit, 특수값(±0, ±Inf, NaN, Denormal) 정의 |
@@ -115,6 +126,8 @@
 | IPC (Instructions Per Cycle) | 사이클당 명령어 수. CPI<1일 때(multiple issue) 사용. IPC=1/CPI |
 | Little Endian | 최하위 바이트가 가장 낮은 주소. RISC-V 사용 |
 | Locality | Temporal(최근→재접근) + Spatial(인접→접근). 메모리 계층의 이론적 근거 |
+| MIMD | Multiple Instruction Multiple Data. 여러 프로세서가 독립 명령어로 독립 데이터 처리. 멀티코어 |
+| NUMA | Non-Uniform Memory Access. 로컬 메모리가 더 빠른 공유 메모리 구조. Memory affinity 중요 |
 | lr.d / sc.d | Load Reserved / Store Conditional. 동기화용 atomic 쌍 |
 | lui | 20-bit 상수를 rd[31:12]에 로드, sign extend, [11:0]=0 |
 | Moore's Law | IC 트랜지스터 수 약 2년마다 2배. 경험적 관찰(물리법칙 아님) |
@@ -126,6 +139,9 @@
 | Pipeline Register | 각 stage 사이의 레지스터. 이전 cycle 정보 보존 (IF/ID, ID/EX, EX/MEM, MEM/WB) |
 | R/I/S/SB/U/UJ-type | RISC-V 6가지 32-bit 고정길이 명령어 포맷 |
 | RISC-V | UC Berkeley 개발 오픈 RISC ISA. 이 과목 기준 ISA |
+| Roofline Model | Attainable GFLOP = Min(BW×AI, Peak FP). AI로 memory/compute bound 판별 |
+| SMT (Simultaneous Multithreading) | 다중 발행 프로세서에서 여러 스레드의 명령어를 동시 스케줄링. Intel HT |
+| SPMD | Single Program Multiple Data. MIMD에서 같은 프로그램을 조건문으로 분기. 가장 흔한 병렬 모델 |
 | Saturating Operation | 오버플로우 시 wrap-around 대신 최대/최소값으로 고정. 오디오/비디오 처리에 사용 |
 | SIMD | Single Instruction Multiple Data. 하나의 명령어로 여러 데이터를 동시 처리. SSE/AVX가 대표적 |
 | Sign Extension | 넓은 비트 확장 시 부호비트 복제. lb(sign), lbu(zero) |
@@ -238,6 +254,18 @@ perf/TCO ↑ 전략:
 **Multilevel 예시**: L1만: CPI=1+0.02×400=9. L2 추가(5ns,0.5% global miss): CPI=1+0.02×20+0.005×400=3.4 → 2.6× 향상
 
 **3C's**: Compulsory(첫접근)→block↑/prefetch. Capacity→cache↑. Conflict→assoc↑
+
+### Chapter 6: Parallel Processors from Client to Cloud
+
+(이전 채팅에서 상세 정리 완료 — 57 slides 전체 반영)
+
+핵심 토픽: 병렬 프로그래밍의 어려움(partitioning/coordination/communication), Amdahl's Law 병렬 버전(Speedup=1/((1-F)+F/N)), Strong vs Weak scaling, Flynn 분류(SISD/SIMD/MIMD/SPMD), Vector processor(RISC-V vector, DAXPY 예시), SIMD(SSE/AVX) vs Vector, Hardware Multithreading(Fine-grain/Coarse-grain/SMT), Shared Memory(SMP, UMA/NUMA, lock, Sum Reduction), GPU(GPGPU, SM/SP/Warp, Tesla 구조, CUDA), GPU vs CPU 비교(캐시/스레드/BW/coherence), Message Passing(send/receive, Cluster, Grid), Network Topologies(Bus/Ring/Mesh/N-cube/Fully-connected, bisection BW), Roofline Model(AI=FLOPs/Byte, Attainable=Min(BW×AI,Peak), memory/compute bound), 병렬 벤치마크(Linpack/SPLASH/NAS/PARSEC), OpenMP DGEMM
+
+**Amdahl 병렬 예시**: 100 프로세서 90× speedup? → F=0.999 필요 (순차 0.1%만)
+
+**Scaling 예시**: 10 scalar + 100 matrix. 100 proc → Speedup=10(10%). 10000 matrix → Speedup=91(91%)
+
+**Roofline**: Memory bound(AI낮음)→BW 최적화. Compute bound(AI높음)→FP 최적화. 캐싱이 AI를 높임
 
 ---
 
@@ -354,3 +382,23 @@ perf/TCO ↑ 전략:
 - [ ] Cache Coherence: Snooping invalidate protocol 동작
 - [ ] Hamming SEC/DEC: ECC DRAM (64bit당 8bit 보호)
 - [ ] SW optimization: cache blocking(tiling)으로 temporal locality 극대화
+
+### Ch6 계산
+- [ ] Amdahl 병렬: Speedup = 1/((1-F)+F/N), 필요한 F 계산
+- [ ] Strong scaling speedup 계산 (순차+병렬 분리)
+- [ ] Weak scaling 성능 비교
+- [ ] Roofline: AI 계산 → memory/compute bound 판별
+
+### Ch6 개념
+- [ ] 병렬 프로그래밍의 3가지 어려움 (partitioning/coordination/communication)
+- [ ] Strong vs Weak scaling 차이와 예시
+- [ ] Flynn 분류: SISD/SIMD/MIMD/SPMD 정의
+- [ ] Vector vs SIMD(SSE/AVX) 차이 (가변 폭, stride)
+- [ ] Fine-grain / Coarse-grain / SMT 멀티스레딩 차이
+- [ ] Shared Memory(SMP, UMA/NUMA) vs Message Passing(send/receive)
+- [ ] GPU 구조: SM, SP, Warp(32 threads), SIMD 실행
+- [ ] GPU vs CPU: 캐시/스레드/BW/coherence 차이
+- [ ] Roofline Model: AI, memory bound vs compute bound 판별
+- [ ] Network topology: bisection bandwidth 개념
+- [ ] Fine-grained locking의 필요성 (단일 lock → 직렬화)
+- [ ] OpenMP #pragma omp parallel for 의미
