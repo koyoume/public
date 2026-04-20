@@ -97,7 +97,7 @@
 
 | 용어 | 정의 |
 |------|------|
-| ABI | ISA + 시스템SW 인터페이스. 같은 ISA라도 OS 다르면 ABI 다를 수 있음 |
+| ABI (Application Binary Interface) | ISA + 시스템SW 인터페이스. 같은 ISA라도 OS 다르면 ABI 다를 수 있음 |
 | Abstraction | 하위 세부사항을 숨기고 단순 인터페이스만 노출하는 설계 원칙 |
 | Amdahl's Law | 부분 개선이 전체 성능에 비례하지 않음. T=T_affected/n + T_unaffected |
 | AMAT | Average Memory Access Time = Hit time + Miss rate × Miss penalty |
@@ -105,8 +105,8 @@
 | Cache Memory | CPU 내/근처 소형 고속 SRAM. 메인메모리 접근 지연 감소 |
 | Cache Coherence | 멀티프로세서 공유 데이터 일관성. Snooping(버스 감시)/Directory(상태 기록) |
 | CAPEX (Capital Expenditure) | 자본적 지출. 서버·장비·인프라 등 초기 구매/구축 비용. 일회성 투자 |
-| CISC | 복잡·다양·가변길이 명령어. x86 대표 |
-| CPI | 명령어당 평균 클럭 사이클. CPU HW와 명령어 mix에 의해 결정 |
+| CISC (Complex Instruction Set Computer) | 복잡·다양·가변길이 명령어. x86 대표 |
+| CPI (Cycles Per Instruction) | 명령어당 평균 클럭 사이클. CPU HW와 명령어 mix에 의해 결정 |
 | Datapath | 프로세서 내부 데이터 연산 유닛 (ALU, 레지스터) |
 | Denormal Number | Exponent=0일 때 hidden bit=0. 정규화 수보다 더 작은 값 표현. Gradual underflow 허용 |
 | Control | 명령어 해석(decode) → Datapath에 제어 신호 |
@@ -121,13 +121,13 @@
 | IC (Instruction Count) | 프로그램 실행 시 총 명령어 수 |
 | IEEE 754 | 부동소수점 표현 및 연산의 국제 표준. Single(32-bit), Double(64-bit). Bias, hidden bit, 특수값(±0, ±Inf, NaN, Denormal) 정의 |
 | Infinity (±∞) | Exp=111...1, Frac=000...0. 오버플로우 시 사용. 후속 계산에 전파 가능 |
-| ISA | HW/SW 인터페이스. 프로세서가 이해하는 명령어 집합 정의 |
+| ISA (Instruction Set Architecture) | HW/SW 인터페이스. 프로세서가 이해하는 명령어 집합 정의 |
 | ILP (Instruction-Level Parallelism) | 파이프라인/다중 발행으로 여러 명령어를 동시 실행하는 병렬성 |
 | IPC (Instructions Per Cycle) | 사이클당 명령어 수. CPI<1일 때(multiple issue) 사용. IPC=1/CPI |
 | Little Endian | 최하위 바이트가 가장 낮은 주소. RISC-V 사용 |
 | Locality | Temporal(최근→재접근) + Spatial(인접→접근). 메모리 계층의 이론적 근거 |
-| MIMD | Multiple Instruction Multiple Data. 여러 프로세서가 독립 명령어로 독립 데이터 처리. 멀티코어 |
-| NUMA | Non-Uniform Memory Access. 로컬 메모리가 더 빠른 공유 메모리 구조. Memory affinity 중요 |
+| MIMD (Multiple Instruction Multiple Data) | Multiple Instruction Multiple Data. 여러 프로세서가 독립 명령어로 독립 데이터 처리. 멀티코어 |
+| NUMA (Non-Uniform Memory Access) | Non-Uniform Memory Access. 로컬 메모리가 더 빠른 공유 메모리 구조. Memory affinity 중요 |
 | lr.d / sc.d | Load Reserved / Store Conditional. 동기화용 atomic 쌍 |
 | lui | 20-bit 상수를 rd[31:12]에 로드, sign extend, [11:0]=0 |
 | Moore's Law | IC 트랜지스터 수 약 2년마다 2배. 경험적 관찰(물리법칙 아님) |
@@ -141,11 +141,11 @@
 | RISC-V | UC Berkeley 개발 오픈 RISC ISA. 이 과목 기준 ISA |
 | Roofline Model | Attainable GFLOP = Min(BW×AI, Peak FP). AI로 memory/compute bound 판별 |
 | SMT (Simultaneous Multithreading) | 다중 발행 프로세서에서 여러 스레드의 명령어를 동시 스케줄링. Intel HT |
-| SPMD | Single Program Multiple Data. MIMD에서 같은 프로그램을 조건문으로 분기. 가장 흔한 병렬 모델 |
+| SPMD (Single Program Multiple Data) | Single Program Multiple Data. MIMD에서 같은 프로그램을 조건문으로 분기. 가장 흔한 병렬 모델 |
 | Saturating Operation | 오버플로우 시 wrap-around 대신 최대/최소값으로 고정. 오디오/비디오 처리에 사용 |
-| SIMD | Single Instruction Multiple Data. 하나의 명령어로 여러 데이터를 동시 처리. SSE/AVX가 대표적 |
+| SIMD (Single Instruction Multiple Data) | Single Instruction Multiple Data. 하나의 명령어로 여러 데이터를 동시 처리. SSE/AVX가 대표적 |
 | Sign Extension | 넓은 비트 확장 시 부호비트 복제. lb(sign), lbu(zero) |
-| SPEC | Standard Performance Evaluation Corp. 기하평균 벤치마크 |
+| SPEC (Standard Performance Evaluation Corporation) | Standard Performance Evaluation Corp. 기하평균 벤치마크 |
 | Stored Program | 명령어도 이진수로 메모리 저장. 프로그램이 프로그램 조작 가능 |
 | TLB (Translation Lookaside Buffer) | CPU 내 PTE 캐시. 주소 변환 가속. hit 0.5~1cy, miss 10~100cy |
 | Virtual Memory | 메인메모리를 디스크의 캐시로 사용. 프로그램별 가상 주소 공간, 보호, Page Table로 변환 |
@@ -154,56 +154,56 @@
 | TCO (Total Cost of Ownership) | 총 소유 비용 = CAPEX + OPEX. 시스템의 전체 수명 동안 발생하는 모든 비용. 성능 평가 시 단순 구매가가 아닌 TCO 기준이 실질적 |
 | perf/TCO | TCO 단위당 성능. 실질적 가성비 지표. 전력 효율이 좋은 시스템은 OPEX↓→TCO↓→perf/TCO↑ |
 | Yield | 웨이퍼당 정상 다이 비율. 면적↑→수율↓→비용 비선형↑ |
-| ALU | Arithmetic Logic Unit. CPU 내 산술/논리 연산 수행 핵심 HW 유닛 |
-| ASCII | American Standard Code for Information Interchange. 7-bit 128문자 인코딩 |
-| AVX | Advanced Vector Extensions. x86 256/512-bit SIMD 확장 명령어 세트 |
-| BHT | Branch History Table. 분기 예측용 최근 분기 결과 기록 테이블 |
-| BTB | Branch Target Buffer. 분기 타겟 주소 캐싱. taken branch fetch 지연 제거 |
-| CMOS | Complementary MOS. 현대 IC 제조 기본 기술. Power = C×V²×f |
-| CPU | Central Processing Unit. Datapath + Control로 구성 |
-| CUDA | Compute Unified Device Architecture. NVIDIA GPGPU 플랫폼/언어 |
-| DAXPY | Double-precision A×X Plus Y. 벡터 연산 벤치마크 (Y = a×X+Y) |
-| DDR | Double Data Rate. 클럭 상승/하강 에지 모두 전송하는 DRAM 기술 |
-| DGEMM | Double-precision General Matrix Multiply. 행렬 곱셈 벤치마크 커널 |
-| DRAM | Dynamic RAM. 커패시터 전하 저장, refresh 필요. 메인 메모리 |
-| ECC | Error Correcting Code. 메모리 오류 검출/정정 코드 (SEC/DEC 등) |
-| FP | Floating Point. 부동소수점. IEEE 754로 실수 표현 |
-| FPU | Floating Point Unit. 부동소수점 연산 전용 HW 유닛 |
-| FSM | Finite State Machine. 유한 상태 기계. 캐시 컨트롤러 등 제어 로직 구현 |
-| FTL | Flash Translation Layer. 플래시 wear leveling + 논리-물리 주소 매핑 |
-| HLL | High-Level Language. 고수준 프로그래밍 언어 (C, Java, Python) |
-| HT | Hyper-Threading. Intel의 SMT 구현 (1코어 2스레드 동시 실행) |
-| LAN | Local Area Network. 건물 내 근거리 네트워크 (Ethernet) |
-| LRU | Least Recently Used. 가장 오래 안 쓴 항목을 교체하는 정책 |
+| ALU (Arithmetic Logic Unit) | Arithmetic Logic Unit. CPU 내 산술/논리 연산 수행 핵심 HW 유닛 |
+| ASCII (American Standard Code for Information Interchange) | American Standard Code for Information Interchange. 7-bit 128문자 인코딩 |
+| AVX (Advanced Vector Extensions) | Advanced Vector Extensions. x86 256/512-bit SIMD 확장 명령어 세트 |
+| BHT (Branch History Table) | Branch History Table. 분기 예측용 최근 분기 결과 기록 테이블 |
+| BTB (Branch Target Buffer) | Branch Target Buffer. 분기 타겟 주소 캐싱. taken branch fetch 지연 제거 |
+| CMOS (Complementary Metal-Oxide-Semiconductor) | Complementary MOS. 현대 IC 제조 기본 기술. Power = C×V²×f |
+| CPU (Central Processing Unit) | Central Processing Unit. Datapath + Control로 구성 |
+| CUDA (Compute Unified Device Architecture) | Compute Unified Device Architecture. NVIDIA GPGPU 플랫폼/언어 |
+| DAXPY (Double-precision A×X Plus Y) | Double-precision A×X Plus Y. 벡터 연산 벤치마크 (Y = a×X+Y) |
+| DDR (Double Data Rate) | Double Data Rate. 클럭 상승/하강 에지 모두 전송하는 DRAM 기술 |
+| DGEMM (Double-precision General Matrix Multiply) | Double-precision General Matrix Multiply. 행렬 곱셈 벤치마크 커널 |
+| DRAM (Dynamic Random Access Memory) | Dynamic RAM. 커패시터 전하 저장, refresh 필요. 메인 메모리 |
+| ECC (Error Correcting Code) | Error Correcting Code. 메모리 오류 검출/정정 코드 (SEC/DEC 등) |
+| FP (Floating Point) | Floating Point. 부동소수점. IEEE 754로 실수 표현 |
+| FPU (Floating Point Unit) | Floating Point Unit. 부동소수점 연산 전용 HW 유닛 |
+| FSM (Finite State Machine) | Finite State Machine. 유한 상태 기계. 캐시 컨트롤러 등 제어 로직 구현 |
+| FTL (Flash Translation Layer) | Flash Translation Layer. 플래시 wear leveling + 논리-물리 주소 매핑 |
+| HLL (High-Level Language) | High-Level Language. 고수준 프로그래밍 언어 (C, Java, Python) |
+| HT (Hyper-Threading) | Hyper-Threading. Intel의 SMT 구현 (1코어 2스레드 동시 실행) |
+| LAN (Local Area Network) | Local Area Network. 건물 내 근거리 네트워크 (Ethernet) |
+| LRU (Least Recently Used) | Least Recently Used. 가장 오래 안 쓴 항목을 교체하는 정책 |
 | MIPS | (1) Stanford MIPS ISA 또는 (2) Millions of Instr/Sec (성능 지표, ISA/복잡도 무시→신뢰 불가) |
-| MMX | Multi-Media eXtension. x86 초기 64-bit SIMD 확장 |
-| MTBF | Mean Time Between Failures = MTTF + MTTR |
-| MTTF | Mean Time To Failure. 평균 고장 시간 (신뢰성 지표) |
-| MTTR | Mean Time To Repair. 평균 수리 시간 |
-| NFC | Near Field Communication. 근거리 무선 통신 |
-| OoO | Out-of-Order execution. 의존성 없는 명령어를 순서 바꿔 먼저 실행 |
-| OS | Operating System. I/O·메모리·스케줄링 관리 시스템 소프트웨어 |
-| PC | Program Counter. 현재/다음 실행 명령어 주소 저장 레지스터 |
-| PMD | Personal Mobile Device. 배터리 구동 모바일 장치 (스마트폰, 태블릿) |
-| PTE | Page Table Entry. 가상→물리 페이지 매핑 정보 (valid/dirty/reference bit) |
-| QDR | Quad Data Rate. DDR보다 높은 BW의 DRAM (별도 DDR 입출력) |
-| RISC | Reduced Instruction Set Computer. 단순·규칙·고정길이 ISA 설계 철학 |
-| SCAUSE | Supervisor Exception Cause Register. RISC-V 예외 원인 코드 저장 |
-| SEC/DEC | Single Error Correction / Double Error Detection. Hamming 코드 기반 |
-| SEPC | Supervisor Exception PC. RISC-V 예외 발생 명령어의 PC 저장 |
-| SM | Streaming Multiprocessor. GPU 내 여러 SP를 묶은 처리 유닛 (NVIDIA) |
-| SMP | Symmetric Multiprocessor. 모든 프로세서가 공유 메모리에 동등 접근 |
-| SoC | System on Chip. CPU+GPU+NPU+MemCtrl 등 단일 칩 집적 |
-| SP | Streaming Processor. GPU 내 기본 연산 유닛 (NVIDIA) |
-| SRAM | Static RAM. 빠르고 비쌈. 캐시에 사용 |
-| SRT | Sweeney-Robertson-Tocher. 고속 나눗셈 알고리즘 (여러 몫 비트/단계) |
-| SSE | Streaming SIMD Extensions. x86 128-bit SIMD 확장 |
-| UMA | Uniform Memory Access. 모든 프로세서 메모리 접근 시간 동일 |
-| VLIW | Very Long Instruction Word. 컴파일러가 여러 연산을 하나의 긴 명령어로 패킹 |
-| VMM | Virtual Machine Monitor. 가상→물리 자원 매핑 (하이퍼바이저) |
-| WAN | Wide Area Network. 광역 네트워크 (인터넷) |
+| MMX (Multi-Media eXtension) | Multi-Media eXtension. x86 초기 64-bit SIMD 확장 |
+| MTBF (Mean Time Between Failures) | Mean Time Between Failures = MTTF + MTTR |
+| MTTF (Mean Time To Failure) | Mean Time To Failure. 평균 고장 시간 (신뢰성 지표) |
+| MTTR (Mean Time To Repair) | Mean Time To Repair. 평균 수리 시간 |
+| NFC (Near Field Communication) | Near Field Communication. 근거리 무선 통신 |
+| OoO (Out-of-Order) | Out-of-Order execution. 의존성 없는 명령어를 순서 바꿔 먼저 실행 |
+| OS (Operating System) | Operating System. I/O·메모리·스케줄링 관리 시스템 소프트웨어 |
+| PC (Program Counter) | Program Counter. 현재/다음 실행 명령어 주소 저장 레지스터 |
+| PMD (Personal Mobile Device) | Personal Mobile Device. 배터리 구동 모바일 장치 (스마트폰, 태블릿) |
+| PTE (Page Table Entry) | Page Table Entry. 가상→물리 페이지 매핑 정보 (valid/dirty/reference bit) |
+| QDR (Quad Data Rate) | Quad Data Rate. DDR보다 높은 BW의 DRAM (별도 DDR 입출력) |
+| RISC (Reduced Instruction Set Computer) | Reduced Instruction Set Computer. 단순·규칙·고정길이 ISA 설계 철학 |
+| SCAUSE (Supervisor Exception Cause Register) | Supervisor Exception Cause Register. RISC-V 예외 원인 코드 저장 |
+| SEC/DEC (Single Error Correction / Double Error Detection) | Single Error Correction / Double Error Detection. Hamming 코드 기반 |
+| SEPC (Supervisor Exception Program Counter) | Supervisor Exception PC. RISC-V 예외 발생 명령어의 PC 저장 |
+| SM (Streaming Multiprocessor) | Streaming Multiprocessor. GPU 내 여러 SP를 묶은 처리 유닛 (NVIDIA) |
+| SMP (Symmetric Multiprocessor) | Symmetric Multiprocessor. 모든 프로세서가 공유 메모리에 동등 접근 |
+| SoC (System on Chip) | System on Chip. CPU+GPU+NPU+MemCtrl 등 단일 칩 집적 |
+| SP (Streaming Processor) | Streaming Processor. GPU 내 기본 연산 유닛 (NVIDIA) |
+| SRAM (Static Random Access Memory) | Static RAM. 빠르고 비쌈. 캐시에 사용 |
+| SRT (Sweeney-Robertson-Tocher) | Sweeney-Robertson-Tocher. 고속 나눗셈 알고리즘 (여러 몫 비트/단계) |
+| SSE (Streaming SIMD Extensions) | Streaming SIMD Extensions. x86 128-bit SIMD 확장 |
+| UMA (Uniform Memory Access) | Uniform Memory Access. 모든 프로세서 메모리 접근 시간 동일 |
+| VLIW (Very Long Instruction Word) | Very Long Instruction Word. 컴파일러가 여러 연산을 하나의 긴 명령어로 패킹 |
+| VMM (Virtual Machine Monitor) | Virtual Machine Monitor. 가상→물리 자원 매핑 (하이퍼바이저) |
+| WAN (Wide Area Network) | Wide Area Network. 광역 네트워크 (인터넷) |
 | Warp | GPU에서 32개 스레드의 그룹. SIMD 방식으로 동시 실행 (NVIDIA) |
-| WSC | Warehouse Scale Computer. 창고 규모 데이터센터 컴퓨팅 시스템 |
+| WSC (Warehouse Scale Computer) | Warehouse Scale Computer. 창고 규모 데이터센터 컴퓨팅 시스템 |
 
 ---
 
