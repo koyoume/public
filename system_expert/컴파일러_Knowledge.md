@@ -1452,6 +1452,96 @@ loop: if(t2'>=t3) goto L1; *t2'=0; t2'+=4; goto loop
 → 곱셈 제거, i 제거, 루프 3명령어
 ```
 
+---
+
+### Practice Problem 2: Anticipation Analysis + True Value Analysis
+
+#### PP2-1. Anticipation Analysis 전체 풀이
+
+```
+프레임워크: Backward, meet=intersection, 분배적
+전달: IN[b] = GEN[b] union (OUT[b] - KILL[b])
+합류: OUT[b] = intersection IN[succ]
+경계: OUT[exit]={}. 초기화: IN[b]=U(전체)
+
+명령어 "w = x+y" (Backward):
+  GEN: {x+y} (계산되므로 위에서 anticipated)
+  KILL: {w포함 식} (w 재정의하면 위의 w+? 무효)
+
+"a = a+b": GEN={a+b}, KILL={a포함}. GEN이 KILL보다 우선 -> a+b 살아남음
+
+BB합성(Bwd): GEN_BB = gen_위 union (gen_아래 - kill_위)
+             KILL_BB = kill_위 union kill_아래
+```
+
+**[예시문제]** CFG: BB0->{BB1,BB2}->BB3.
+BB1: b=a+b, d=b+c. BB2: e=a+b, g=a+c. BB3: f=b+c, a=a+c.
+표현식: a+b, a+c, b+c. Anticipated를 구하라.
+
+**[풀이]**:
+```
+GEN/KILL (Backward 합성):
+  BB0: GEN={}, KILL={}
+  BB1 (d=b+c 먼저, b=a+b 나중):
+    d=b+c: gen={b+c}, kill={}
+    b=a+b: gen={a+b}, kill={a+b,b+c}
+    합성: GEN={a+b} union ({b+c}-{a+b,b+c})={a+b}
+          KILL={a+b,b+c}
+  BB2 (g=a+c 먼저, e=a+b 나중):
+    GEN={a+b,a+c}, KILL={}
+  BB3 (a=a+c 먼저, f=b+c 나중):
+    a=a+c: gen={a+c}, kill={a+b,a+c}
+    f=b+c: gen={b+c}, kill={}
+    합성: GEN={b+c,a+c}, KILL={a+b,a+c}
+
+반복(Bwd, 초기 IN=U):
+  BB3: OUT={} -> IN={b+c,a+c}
+  BB1: OUT={b+c,a+c} -> IN={a+b} union ({b+c,a+c}-{a+b,b+c})={a+b,a+c}
+  BB2: OUT={b+c,a+c} -> IN={a+b,a+c} union {b+c,a+c}={a+b,a+c,b+c}
+  BB0: OUT=IN[BB1] inter IN[BB2]={a+b,a+c} inter {a+b,a+c,b+c}={a+b,a+c}
+       IN={a+b,a+c}
+  2회차: 변화 없음 -> 수렴!
+
+최종: BB0:IN/OUT={a+b,a+c}. BB1:IN={a+b,a+c}. BB2:IN={a+b,a+c,b+c}. BB3:IN={b+c,a+c}
+해석: BB0 OUT에 b+c 없음 = BB2 경로에서 b+c 미계산 -> inter 탈락
+      BB1 IN에 b+c 없음 = b=a+b로 b 재정의 -> 위의 b+c가 아래의 b+c와 다른 값 -> KILL
+```
+
+#### PP2-2. True Value Analysis
+
+```
+Boolean 변수 (a=TRUE/FALSE/b/NOT b)
+각 지점에서 possibly TRUE인지
+
+도메인(1변수): {},{T},{F},{T,F}
+격자 (meet=union):
+  {T,F}=Bottom, {}=Top
+  (meet=union에서 큰 집합=아래)
+
+Forward, meet=union
+경계: IN[entry]={}
+초기화: OUT[b]={} (=Top)
+
+전달함수 (변수 x에 대해):
+  x 미대입:  OUT(x) = IN(x)
+  x=TRUE:   OUT(x) = {T}
+  x=FALSE:  OUT(x) = {F}
+  x=y:      OUT(x) = IN(y)
+  x=NOT y:  OUT(x) = flip(IN(y))
+    flip: {}->{}  {T}->{F}  {F}->{T}  {T,F}->{T,F}
+
+단조적 확인 (a=NOT b):
+  IN1={T,F}, IN2={T}: {T,F} <= {T} (큰집합이 아래)
+  OUT1=flip({T,F})={T,F}, OUT2=flip({T})={F}
+  {T,F} <= {F} -> YES!
+  
+  IN1={F}, IN2={}: {F} <= {} 
+  OUT1=flip({F})={T}, OUT2=flip({})={}
+  {T} <= {} -> YES!
+
+수렴: 높이=2 + 단조 -> 반드시 수렴!
+```
+
 ## ⑤ 시험 대비 체크리스트
 
 ### 계산 문제 유형
