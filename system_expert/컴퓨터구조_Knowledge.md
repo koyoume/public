@@ -154,6 +154,56 @@
 | TCO (Total Cost of Ownership) | 총 소유 비용 = CAPEX + OPEX. 시스템의 전체 수명 동안 발생하는 모든 비용. 성능 평가 시 단순 구매가가 아닌 TCO 기준이 실질적 |
 | perf/TCO | TCO 단위당 성능. 실질적 가성비 지표. 전력 효율이 좋은 시스템은 OPEX↓→TCO↓→perf/TCO↑ |
 | Yield | 웨이퍼당 정상 다이 비율. 면적↑→수율↓→비용 비선형↑ |
+| ALU | Arithmetic Logic Unit. CPU 내 산술/논리 연산 수행 핵심 HW 유닛 |
+| ASCII | American Standard Code for Information Interchange. 7-bit 128문자 인코딩 |
+| AVX | Advanced Vector Extensions. x86 256/512-bit SIMD 확장 명령어 세트 |
+| BHT | Branch History Table. 분기 예측용 최근 분기 결과 기록 테이블 |
+| BTB | Branch Target Buffer. 분기 타겟 주소 캐싱. taken branch fetch 지연 제거 |
+| CMOS | Complementary MOS. 현대 IC 제조 기본 기술. Power = C×V²×f |
+| CPU | Central Processing Unit. Datapath + Control로 구성 |
+| CUDA | Compute Unified Device Architecture. NVIDIA GPGPU 플랫폼/언어 |
+| DAXPY | Double-precision A×X Plus Y. 벡터 연산 벤치마크 (Y = a×X+Y) |
+| DDR | Double Data Rate. 클럭 상승/하강 에지 모두 전송하는 DRAM 기술 |
+| DGEMM | Double-precision General Matrix Multiply. 행렬 곱셈 벤치마크 커널 |
+| DRAM | Dynamic RAM. 커패시터 전하 저장, refresh 필요. 메인 메모리 |
+| ECC | Error Correcting Code. 메모리 오류 검출/정정 코드 (SEC/DEC 등) |
+| FP | Floating Point. 부동소수점. IEEE 754로 실수 표현 |
+| FPU | Floating Point Unit. 부동소수점 연산 전용 HW 유닛 |
+| FSM | Finite State Machine. 유한 상태 기계. 캐시 컨트롤러 등 제어 로직 구현 |
+| FTL | Flash Translation Layer. 플래시 wear leveling + 논리-물리 주소 매핑 |
+| HLL | High-Level Language. 고수준 프로그래밍 언어 (C, Java, Python) |
+| HT | Hyper-Threading. Intel의 SMT 구현 (1코어 2스레드 동시 실행) |
+| LAN | Local Area Network. 건물 내 근거리 네트워크 (Ethernet) |
+| LRU | Least Recently Used. 가장 오래 안 쓴 항목을 교체하는 정책 |
+| MIPS | (1) Stanford MIPS ISA 또는 (2) Millions of Instr/Sec (성능 지표, ISA/복잡도 무시→신뢰 불가) |
+| MMX | Multi-Media eXtension. x86 초기 64-bit SIMD 확장 |
+| MTBF | Mean Time Between Failures = MTTF + MTTR |
+| MTTF | Mean Time To Failure. 평균 고장 시간 (신뢰성 지표) |
+| MTTR | Mean Time To Repair. 평균 수리 시간 |
+| NFC | Near Field Communication. 근거리 무선 통신 |
+| OoO | Out-of-Order execution. 의존성 없는 명령어를 순서 바꿔 먼저 실행 |
+| OS | Operating System. I/O·메모리·스케줄링 관리 시스템 소프트웨어 |
+| PC | Program Counter. 현재/다음 실행 명령어 주소 저장 레지스터 |
+| PMD | Personal Mobile Device. 배터리 구동 모바일 장치 (스마트폰, 태블릿) |
+| PTE | Page Table Entry. 가상→물리 페이지 매핑 정보 (valid/dirty/reference bit) |
+| QDR | Quad Data Rate. DDR보다 높은 BW의 DRAM (별도 DDR 입출력) |
+| RISC | Reduced Instruction Set Computer. 단순·규칙·고정길이 ISA 설계 철학 |
+| SCAUSE | Supervisor Exception Cause Register. RISC-V 예외 원인 코드 저장 |
+| SEC/DEC | Single Error Correction / Double Error Detection. Hamming 코드 기반 |
+| SEPC | Supervisor Exception PC. RISC-V 예외 발생 명령어의 PC 저장 |
+| SM | Streaming Multiprocessor. GPU 내 여러 SP를 묶은 처리 유닛 (NVIDIA) |
+| SMP | Symmetric Multiprocessor. 모든 프로세서가 공유 메모리에 동등 접근 |
+| SoC | System on Chip. CPU+GPU+NPU+MemCtrl 등 단일 칩 집적 |
+| SP | Streaming Processor. GPU 내 기본 연산 유닛 (NVIDIA) |
+| SRAM | Static RAM. 빠르고 비쌈. 캐시에 사용 |
+| SRT | Sweeney-Robertson-Tocher. 고속 나눗셈 알고리즘 (여러 몫 비트/단계) |
+| SSE | Streaming SIMD Extensions. x86 128-bit SIMD 확장 |
+| UMA | Uniform Memory Access. 모든 프로세서 메모리 접근 시간 동일 |
+| VLIW | Very Long Instruction Word. 컴파일러가 여러 연산을 하나의 긴 명령어로 패킹 |
+| VMM | Virtual Machine Monitor. 가상→물리 자원 매핑 (하이퍼바이저) |
+| WAN | Wide Area Network. 광역 네트워크 (인터넷) |
+| Warp | GPU에서 32개 스레드의 그룹. SIMD 방식으로 동시 실행 (NVIDIA) |
+| WSC | Warehouse Scale Computer. 창고 규모 데이터센터 컴퓨팅 시스템 |
 
 ---
 
