@@ -32,22 +32,24 @@
 | 이식성 | 낮음 (타겟 종속) | 높음 | 높음 (VM만 있으면 됨) |
 | compile/runtime | 분리 | runtime만 | 2단계 (compile+runtime) |
 
-### Reaching Definitions vs Live Variables
+### Reaching Definitions vs Live Variables vs Available Expr vs Anticipated Expr
 
-| 항목 | Reaching Definitions | Live Variables |
-|------|---------------------|----------------|
-| 도메인 | 정의(definition) 집합 | 변수(variable) 집합 |
-| 비트벡터 크기 | 함수 내 정의 개수 | 함수 내 변수 개수 |
-| 방향 | Forward: OUT=f(IN) | Backward: IN=f(OUT) |
-| 전달함수 | GEN∪(x−KILL) | USE∪(x−DEF) |
-| GEN/USE | GEN: BB 내 마지막 정의 | USE: locally exposed uses |
-| KILL/DEF | KILL: 같은 변수의 다른 정의들 (정적) | DEF: BB에서 정의된 변수 |
-| 합류 연산 | IN[b]=∪OUT[pred] | OUT[b]=∪IN[succ] |
-| 합류 노드 | 여러 pred 가진 노드 | 여러 succ 가진 노드 |
-| 초기화 | OUT[b]={} | IN[b]={} |
-| 경계 조건 | OUT[entry]={} | IN[exit]={} |
-| 변화 시 전파 | successor 추가 | predecessor 추가 |
-| 용도 | live range 구축, 상수 전파 | RA, dead code 제거 |
+| 항목 | Reaching Def (RD) | Live Variables (LV) | Available Expr (AE) | Anticipated Expr |
+|------|-------------------|---------------------|---------------------|-----------------|
+| 질문 | 어떤 정의가 도달? | 변수가 앞으로 사용? | 식이 이미 계산됨? | 식이 앞으로 계산될것? |
+| 도메인 | 정의 집합 | 변수 집합 | 표현식 집합 | 표현식 집합 |
+| 방향 | Forward | Backward | Forward | Backward |
+| meet(∧) | ∪ (어떤 경로든) | ∪ (어떤 경로든) | ∩ (모든 경로에서) | ∩ (모든 경로에서) |
+| 전달함수 | GEN∪(IN−KILL) | USE∪(OUT−DEF) | GEN∪(IN−KILL) | GEN∪(OUT−KILL) |
+| GEN | BB 내 마지막 정의 | locally exposed uses | BB에서 계산된 표현식 | BB에서 계산된 표현식 |
+| KILL | 같은 변수의 다른 정의 | BB에서 정의된 변수 | 타겟변수 포함 표현식 | 타겟변수 포함 표현식 |
+| 합류 | IN=∪OUT[pred] | OUT=∪IN[succ] | IN=∩OUT[pred] | OUT=∩IN[succ] |
+| Top(⊤) | {} | {} | U(전체) | U(전체) |
+| 초기화 | OUT[b]={} | IN[b]={} | OUT[b]=U | IN[b]=U |
+| 경계 | IN[entry]={} | IN[exit]={} | IN[entry]={} | OUT[exit]={} |
+| 분배적 | O (MFP=MOP) | O | O | O |
+| 용도 | live range, 상수전파 | RA, DCE | Global CSE, LICM | PRE (삽입점 판별) |
+| 안전 방향 | 더 많이 포함 | 더 많이 포함 | 더 적게 포함 | 더 적게 포함 |
 
 ### 지역 최적화 기법 비교
 
