@@ -34,6 +34,9 @@
 | **[Ch6] Task** | task name(input d, output count); | 여러 반환, 타이밍 가능 |
 | **[Ch7] Parameterized Adder** | module #(parameter N=4) ... assign {c_out,sum}=x+y+c_in | N-bit 파라미터화 |
 | **[Ch7] Decoder trick** | y = {{m-1{1'b0}}, 1'b1} << x | 1을 x만큼 좌시프트 |
+| **[Ch8] Universal SR** | case({s1,s0}): 00=hold, 01=right, 10=left, 11=load | 4모드 시프트 레지스터 |
+| **[Ch8] LFSR** | d = ^(tap & qout); qout <= {d, qout[N-1:1]} | 의사 난수, 최대 주기 2ⁿ-1 |
+| **[Ch8] Signed cast** | $signed({1'b0, unsigned_val}) | unsigned→signed 변환 시 MSB에 0 추가 |
 
 ---
 
@@ -72,6 +75,9 @@
 | **parameter vs localparam [Ch7]** | 외부 오버라이드 가능, #()이나 defparam | 외부 오버라이드 불가, 내부 파생 상수용 |
 | **defparam vs #() override [Ch7]** | 계층경로로 지정 (비추천) | 인스턴스화 시 직접 지정 (추천, named) |
 | **generate loop vs conditional vs case [Ch7]** | for로 반복 생성 | if/else 또는 case로 조건부 생성 |
+| **Async vs Sync Reset [Ch8]** | sensitivity list에 reset 포함, 즉시 동작 | sensitivity list에 없음, clk edge에서만 |
+| **Ring vs Johnson Counter [Ch8]** | N비트 N상태, one-hot, 그대로 피드백 | N비트 2N상태, 반전 피드백 |
+| **Standard vs Modular LFSR [Ch8]** | 외부 피드백(Fibonacci), 탭 XOR→MSB | 내부 피드백(Galois), 각 탭에 XOR 삽입 |
 
 ---
 
@@ -965,3 +971,12 @@ or  #(t_rise, t_fall, t_off) o1(f,b,c); // rise/fall/turn-off
 - [ ] Parameterized decoder 트릭: {{m-1{1b0}},1b1}<<x [Ch7]
 - [ ] Ripple carry adder generate 패턴 [Ch7]
 - [ ] Hierarchical names 참조 방법 [Ch7]
+- [ ] Async vs Sync Reset sensitivity list 차이와 합성 결과 [Ch8]
+- [ ] Universal Shift Register s1/s0 모드표 [Ch8]
+- [ ] LFSR 특성 다항식과 최대 주기 조건 (primitive polynomial) [Ch8]
+- [ ] Ring counter vs Johnson counter 상태 수와 시퀀스 [Ch8]
+- [ ] Pipelining 시 중간 신호 지연 규칙 [Ch8]
+- [ ] Signed arithmetic: 모든 피연산자 signed 필수, $signed 캐스팅 [Ch8]
+- [ ] bit-select/part-select/concatenation 결과는 항상 unsigned [Ch8]
+- [ ] Binary counter carry: &qout, borrow: ~|qout [Ch8]
+- [ ] Mod-R counter (BCD=mod10) 동작 원리 [Ch8]
