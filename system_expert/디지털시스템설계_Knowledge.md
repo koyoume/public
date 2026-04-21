@@ -32,6 +32,8 @@
 | **[Ch5] Missing turn-off** | t_off = min(t_rise, t_fall) | 2개만 지정 시 |
 | **[Ch6] Function** | function [3:0] func(input [7:0] d); | 단일 반환, 조합논리 전용, 타이밍 불가 |
 | **[Ch6] Task** | task name(input d, output count); | 여러 반환, 타이밍 가능 |
+| **[Ch7] Parameterized Adder** | module #(parameter N=4) ... assign {c_out,sum}=x+y+c_in | N-bit 파라미터화 |
+| **[Ch7] Decoder trick** | y = {{m-1{1'b0}}, 1'b1} << x | 1을 x만큼 좌시프트 |
 
 ---
 
@@ -67,6 +69,9 @@
 | **Function vs Task [Ch6]** | input만, 단일 반환, 타이밍 불가, 조합 전용 | in/out/inout, 여러 반환, 타이밍 가능, 범용 |
 | **Static vs Automatic (Verilog) [Ch6]** | 기본값, 이전 호출 값 유지, 동시실행 위험 | 호출마다 새 할당, 재귀/동시 안전 |
 | **Combinational vs Sequential UDP [Ch6]** | 출력=f(현재입력), reg 아님 | 출력=reg, 상태 테이블, initial 가능 |
+| **parameter vs localparam [Ch7]** | 외부 오버라이드 가능, #()이나 defparam | 외부 오버라이드 불가, 내부 파생 상수용 |
+| **defparam vs #() override [Ch7]** | 계층경로로 지정 (비추천) | 인스턴스화 시 직접 지정 (추천, named) |
+| **generate loop vs conditional vs case [Ch7]** | for로 반복 생성 | if/else 또는 case로 조건부 생성 |
 
 ---
 
@@ -953,3 +958,10 @@ or  #(t_rise, t_fall, t_off) o1(f,b,c); // rise/fall/turn-off
 - [ ] UDP 규칙: scalar만, 출력 1개, z 불가, 합성 불가 [Ch6]
 - [ ] Sequential UDP 테이블 형식 (input : current_state : next_state) [Ch6]
 - [ ] UDP shorthand symbols (?, b, -, r, f, p, n, *) [Ch6]
+- [ ] parameter vs localparam 차이 (오버라이드 가능 여부) [Ch7]
+- [ ] Parameter override: defparam vs #() 인스턴스화 [Ch7]
+- [ ] generate block 세 형태 (loop, conditional, case) [Ch7]
+- [ ] genvar의 특성 (elaboration time만 존재) [Ch7]
+- [ ] Parameterized decoder 트릭: {{m-1{1b0}},1b1}<<x [Ch7]
+- [ ] Ripple carry adder generate 패턴 [Ch7]
+- [ ] Hierarchical names 참조 방법 [Ch7]
