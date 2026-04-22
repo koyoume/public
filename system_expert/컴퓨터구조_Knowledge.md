@@ -148,6 +148,7 @@
 | SPEC (Standard Performance Evaluation Corporation) | Standard Performance Evaluation Corp. 기하평균 벤치마크 |
 | Stored Program | 명령어도 이진수로 메모리 저장. 프로그램이 프로그램 조작 가능 |
 | TLB (Translation Lookaside Buffer) | CPU 내 PTE 캐시. 주소 변환 가속. hit 0.5~1cy, miss 10~100cy |
+| TPU (Tensor Processing Unit) | Google 개발 AI/ML 전용 ASIC. Systolic Array로 행렬 곱셈 특화. GPU보다 전력 효율↑. Domain-Specific Architecture(DSA)의 대표 사례 |
 | Virtual Memory | 메인메모리를 디스크의 캐시로 사용. 프로그램별 가상 주소 공간, 보호, Page Table로 변환 |
 | Superscalar | Dynamic multiple issue. CPU가 런타임에 사이클당 여러 명령어 발행. OoO 실행 가능 |
 | Speculation | 분기 결과 등을 예측하여 미리 실행. 맞으면 commit, 틀리면 flush+rollback |
@@ -181,7 +182,9 @@
 | MTTF (Mean Time To Failure) | Mean Time To Failure. 평균 고장 시간 (신뢰성 지표) |
 | MTTR (Mean Time To Repair) | Mean Time To Repair. 평균 수리 시간 |
 | NFC (Near Field Communication) | Near Field Communication. 근거리 무선 통신 |
-| OoO (Out-of-Order) | Out-of-Order execution. 의존성 없는 명령어를 순서 바꿔 먼저 실행 |
+| OoO (Out-of-Order Execution) | Out-of-Order execution. 의존성 없는 명령어를 프로그램 순서와 무관하게 먼저 실행. Reservation Station+ROB+Register Renaming으로 구현 |
+| In-Order Commit | OoO 실행 결과를 ROB를 통해 반드시 프로그램 순서대로 확정(commit). Precise Exception과 Speculation rollback을 가능하게 하는 핵심 원칙 |
+| ROB (Reorder Buffer) | OoO 프로세서에서 명령어 결과를 프로그램 순서대로 보관하는 버퍼. Head부터 순차 commit하여 in-order commit 보장. 예측 실패 시 flush로 rollback |
 | OS (Operating System) | Operating System. I/O·메모리·스케줄링 관리 시스템 소프트웨어 |
 | PC (Program Counter) | Program Counter. 현재/다음 실행 명령어 주소 저장 레지스터 |
 | PMD (Personal Mobile Device) | Personal Mobile Device. 배터리 구동 모바일 장치 (스마트폰, 태블릿) |
