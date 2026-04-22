@@ -1,6 +1,6 @@
 # 컴파일러 Knowledge
 
-> 삼성DS 시스템 전문가 과정 — 컴파일러 (문수묵 교수) | 마지막 업데이트: Ch1~7,11
+> 삼성DS 시스템 전문가 과정 — 컴파일러 (문수묵 교수) | 마지막 업데이트: Ch1~8,11
 
 ---
 
@@ -1624,6 +1624,80 @@ phi(x1, x2)를 각 predecessor 끝에 copy로 변환:
 ```
 LLVM: 내부 IR이 SSA. DCE/CSE/LICM/상수전파 모두 SSA 기반
 Android Dalvik VM, Java HotSpot VM, V8 JS Engine: SSA 사용
+```
+
+---
+
+### Ch8. Register Allocation — Graph Coloring
+
+#### 8-1. 문제와 용어
+
+```
+문제: 의사 레지스터(수백~수천) → 물리 레지스터(16~32개) 배정
+Allocation: 레지스터에 유지 결정. Assignment: 어떤 레지스터에. Spilling: 메모리로.
+```
+
+#### 8-2. 간섭 그래프와 컬러링
+
+```
+간섭: 두 변수가 어떤 지점에서 동시에 live → 다른 레지스터 필요
+간섭 그래프: 노드=live range, 간선=동시 live 쌍
+레지스터 할당 = n-coloring (n=물리 레지스터 수). NP-complete → 휴리스틱
+
+Live range = 정의 d가 도달(RD) AND 변수가 live(LV)인 지점의 집합
+  겹치는 live range는 merge → 노드가 정밀해짐 → 컬러링 쉬워짐
+```
+
+#### 8-3. Chaitin's Algorithm
+
+```
+핵심: degree < n인 노드는 항상 컬러링 가능!
+
+[Simplify] degree<n 노드를 스택에 push+제거 (이웃 degree 감소)
+[Assign]   스택에서 pop하면서 역순으로 색 배정 (반드시 가능!)
+[Stuck]    모든 degree>=n → spill 필요
+
+Spill 비용/이득: cost=사용횟수×루프가중치, benefit=degree
+  → cost/degree 낮은 노드를 우선 spill
+  → spill 후 load/store 삽입 → 그래프 재구축 → 반복
+```
+
+**[예시문제]** n=3, 그래프 B-E-A-C-D (A가 중심, 모두 A에 연결)를 컬러링하라.
+
+**[풀이]**: D(deg2)→push. E(deg1)→push. C(deg1)→push. A(deg1)→push. B(deg0)→push. Assign: B=R1, A=R2, C=R3, E=R3, D=R1. 완료!
+
+#### 8-4. Optimistic Coloring (Briggs)
+
+```
+Chaitin: degree>=n → 즉시 spill 결정 (비관적)
+Briggs:  degree>=n → 스택에 넣고 나중에 색칠 시도 (낙관적)
+  Assign에서 실제로 색 없으면 그때 spill
+  → Chaitin보다 같거나 적은 spill!
+  예: 다이아몬드 그래프(n=2) → Chaitin은 spill, Briggs는 2색 가능
+```
+
+#### 8-5. Live Range Splitting
+
+```
+Case 1: 거의 죽은 구간 분리 → 번갈아 같은 레지스터 사용 (store/load 경계)
+Case 2: copy 삽입으로 다른 레지스터 배정 → spill 회피
+```
+
+#### 8-6. Copy Coalescing
+
+```
+COPY x,y에서 x,y 비간섭 → 합쳐서 같은 레지스터 → COPY 삭제
+
+전략: Aggressive(무조건) / Conservative(degree 안 늘면만) /
+      Iterated(simplify↔coalesce 반복) / Optimistic(합치되 spill시 분리)
+```
+
+#### 8-7. Caller/Callee-Save + Pre-colored
+
+```
+Caller-save: 호출자 저장. 호출 경계 안 넘는 변수에 배정.
+Callee-save: 피호출자 저장(entry/exit 1번). 호출 넘는 변수에 배정.
+Pre-colored: SP,FP,GP,인자,리턴값 등 미리 고정된 물리 레지스터.
 ```
 
 ## ⑤ 시험 대비 체크리스트
