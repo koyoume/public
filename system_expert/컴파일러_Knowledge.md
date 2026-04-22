@@ -1,6 +1,6 @@
 # 컴파일러 Knowledge
 
-> 삼성DS 시스템 전문가 과정 — 컴파일러 (문수묵 교수) | 마지막 업데이트: Ch1~7
+> 삼성DS 시스템 전문가 과정 — 컴파일러 (문수묵 교수) | 마지막 업데이트: Ch1~7,11
 
 ---
 
@@ -1542,6 +1542,88 @@ Forward, meet=union
   {T} <= {} -> YES!
 
 수렴: 높이=2 + 단조 -> 반드시 수렴!
+```
+
+---
+
+### Ch11. Static Single Assignment (SSA) Form
+
+#### 11-1. SSA 정의와 장점
+
+```
+SSA = 각 변수가 프로그램 텍스트에서 딱 한 번만 정의되는 형태
+  "Static": 텍스트상 1번. 루프 안이면 런타임에 여러번 실행될 수 있음
+
+변환 전:                 변환 후 (SSA):
+a = x + y               a1 = x + y
+b = a - 1               b1 = a1 - 1
+a = y + b   ← a 재정의   a2 = y + b1    ← 새 이름!
+b = x * 4   ← b 재정의   b2 = x * 4
+a = a + b               a3 = a2 + b2
+
+장점:
+  1) use → def가 이름만으로 즉시 연결 (RD 분석 불필요!)
+  2) AE에서 KILL = {} (변수가 재정의 안 되므로)
+  3) Def-Use 체인: O(N*M) → O(N+M)
+  4) 상수 전파, CSE 등이 극적으로 단순화
+```
+
+#### 11-2. φ-function — 합류점에서 값 선택
+
+```
+분기 후 합류점에서 "어느 경로로 왔느냐"에 따라 다른 변수를 선택:
+
+  a1 = 0
+  if (b1 < 4)
+    a2 = b1          ← then 경로
+  a3 = phi(a2, a1)   ← then이면 a2, else면 a1
+  c1 = a3 + b1
+
+phi = 표기법(notational fiction). 실제 실행 안 됨!
+    경로에 따라 값을 선택하는 분석용 표기.
+```
+
+#### 11-3. Dominance Frontier — phi를 어디에 삽입?
+
+```
+DF(x) = {w | x가 w의 어떤 pred를 dominate & x가 w를 strictly-dominate 안 함}
+
+직관: x의 지배 영역 경계. "x의 영향력이 끝나고 다른 경로와 만나는 지점"
+
+phi 삽입 규칙: 변수 a를 정의하는 BB x에 대해, DF(x)의 각 노드에 phi 삽입
+이름 변경: dominator tree를 BFS 방문, 각 use를 가장 가까운 def 이름으로 교체
+```
+
+**[예시문제]** 아래를 SSA로 변환하라.
+```
+  b=M[x]; a=0; if(b<4) a=b; c=a+b;
+```
+
+**[풀이]**:
+```
+  b1=M[x0]; a1=0; if(b1<4) a2=b1;
+  a3=phi(a2,a1); c1=a3+b1
+  → a3은 then이면 a2(=b1), else면 a1(=0)
+```
+
+#### 11-4. Back Transformation — SSA를 일반 형태로
+
+```
+phi(x1, x2)를 각 predecessor 끝에 copy로 변환:
+  phi(x1, x2) → pred1 끝에 "y = x1", pred2 끝에 "y = x2"
+
+★ Lost Copy Problem:
+  Copy propagation 후 back transform하면 순서 문제 발생 가능!
+  해결: Edge-Split SSA Form
+    간선 a→b에서 a가 succ 2개+, b가 pred 2개+이면
+    빈 노드를 사이에 삽입 → copy 충돌 방지
+```
+
+#### 11-5. SSA는 업계 표준
+
+```
+LLVM: 내부 IR이 SSA. DCE/CSE/LICM/상수전파 모두 SSA 기반
+Android Dalvik VM, Java HotSpot VM, V8 JS Engine: SSA 사용
 ```
 
 ## ⑤ 시험 대비 체크리스트
