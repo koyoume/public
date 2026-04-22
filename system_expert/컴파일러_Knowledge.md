@@ -1662,9 +1662,27 @@ Spill 비용/이득: cost=사용횟수×루프가중치, benefit=degree
   → spill 후 load/store 삽입 → 그래프 재구축 → 반복
 ```
 
-**[예시문제]** n=3, 그래프 B-E-A-C-D (A가 중심, 모두 A에 연결)를 컬러링하라.
+**[예시문제]** n=3, 그래프 B-E, B-A, B-C, E-A, E-D, A-C, A-D, C-D를 컬러링하라.
+```
+      B
+     / \
+    E─A─C
+     \ /
+      D
+  모든 노드 degree=3 또는 4 (A=4, B=C=D=E=3)
+```
 
-**[풀이]**: D(deg2)→push. E(deg1)→push. C(deg1)→push. A(deg1)→push. B(deg0)→push. Assign: B=R1, A=R2, C=R3, E=R3, D=R1. 완료!
+**[풀이 — Chaitin]**: 모든 degree>=3 → stuck! → spill 필요 (비관적)
+
+**[풀이 — Briggs Optimistic]**:
+```
+Simplify: degree<3 없음 → D를 스택 push(spill 미확정), 제거
+  D 제거 후: A(deg2), E(deg2) → degree<3 발생!
+  E(deg2)→push. A(deg2→1)→push. B(deg1)→push. C(deg0)→push.
+스택: C,B,A,E,D
+Assign: C=R1, B=R2, A=R3, E=R1, D=R2(이웃:E=R1,A=R3,C=R1→R2가능!)
+→ spill 없이 3색 성공! Briggs가 Chaitin보다 우수한 예.
+```
 
 #### 8-4. Optimistic Coloring (Briggs)
 
