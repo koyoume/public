@@ -78,6 +78,9 @@
 | **Async vs Sync Reset [Ch8]** | sensitivity list에 reset 포함, 즉시 동작 | sensitivity list에 없음, clk edge에서만 |
 | **Ring vs Johnson Counter [Ch8]** | N비트 N상태, one-hot, 그대로 피드백 | N비트 2N상태, 반전 피드백 |
 | **Standard vs Modular LFSR [Ch8]** | 외부 피드백(Fibonacci), 탭 XOR→MSB | 내부 피드백(Galois), 각 탭에 XOR 삽입 |
+| **ASIC vs FPGA [Ch9]** | NRE 높음, 단가 낮음, 성능 최고, 재수정 불가 | NRE 낮음, 단가 높음, 재프로그래밍, 프로토타이핑용 |
+| **ROM vs PLA vs PAL [Ch9]** | ROM: AND고정+OR프로그래밍 / PLA: 둘다 / PAL: AND프로그래밍+OR고정 | ROM 가장 유연(면적↑), PAL 저렴(제약↑) |
+| **LUT vs Gate [Ch9]** | LUT: 2ⁿ SRAM+MUX, 어떤 n-input 함수든 가능 | Gate: 특정 함수만 (AND/OR/XOR) |
 
 ---
 
@@ -980,3 +983,10 @@ or  #(t_rise, t_fall, t_off) o1(f,b,c); // rise/fall/turn-off
 - [ ] bit-select/part-select/concatenation 결과는 항상 unsigned [Ch8]
 - [ ] Binary counter carry: &qout, borrow: ~|qout [Ch8]
 - [ ] Mod-R counter (BCD=mod10) 동작 원리 [Ch8]
+- [ ] NRE vs Unit Cost 그래프 (교차점 k의 의미) [Ch9]
+- [ ] ASIC 종류: Full-custom vs Gate Array vs Standard-cell [Ch9]
+- [ ] PLD 종류: ROM(AND고정) vs PLA(둘다) vs PAL(OR고정) [Ch9]
+- [ ] FPGA의 LUT 구조 (2ⁿ SRAM + MUX) [Ch9]
+- [ ] CLB, IOB, Programmable Interconnect 역할 [Ch9]
+- [ ] Modern FPGA: 6-input LUT, DSP48, BRAM, SLICEM vs SLICEL [Ch9]
+- [ ] FPGA vs ASIC 장단점 비교 [Ch9]
