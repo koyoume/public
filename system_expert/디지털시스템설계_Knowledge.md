@@ -41,6 +41,9 @@
 | **[Ch10] Hold constraint** | tccq + tcd ≥ thold | 클럭 속도와 무관! |
 | **[Ch10] Setup w/ skew** | Tc ≥ tpcq + tpd + tsetup - δ | δ>0: 여유↑ |
 | **[Ch10] Hold w/ skew** | tccq + tcd ≥ thold + δ | δ>0: 위험↑ |
+| **[Ch11] 2s complement** | N = -a_{n-1}·2^{n-1} + Σ a_i·2^i | MSB 가중치 음수 |
+| **[Ch11] 2s comp 변환** | 비트 반전 + 1 | 또는 M - Y (M=2^k) |
+| **[Ch11] Overflow** | cout ⊕ carry_into_sign = 1 | 동부호+결과부호≠ |
 
 ---
 
@@ -88,6 +91,8 @@
 | **Setup vs Hold violation [Ch10]** | 클럭 느리게 해서 해결 가능 | 클럭 속도 무관, 버퍼 삽입 필요 |
 | **Positive vs Negative skew [Ch10]** | 수신 FF 늦게 받음, setup여유↑ hold위험↑ | 수신 FF 먼저 받음, setup여유↓ hold안전↑ |
 | **tpd vs tcd [Ch10]** | 최대 전파 지연 (worst-case) | 최소 오염 지연 (best-case) |
+| **Sign-mag vs 1s comp vs 2s comp [Ch11]** | SM: 0두개,HW복잡 / 1s: 0두개,end-around carry | 2s: 0하나, HW단순, 가장 인기 |
+| **Biased vs 2s complement [Ch11]** | unsigned비교 가능, 지수필드용 | 덧셈/뺄셈 HW단순, 범용 정수 |
 
 ---
 
@@ -1003,6 +1008,15 @@ or  #(t_rise, t_fall, t_off) o1(f,b,c); // rise/fall/turn-off
 - [ ] Hold violation이 클럭 속도로 해결 안 되는 이유 [Ch10]
 - [ ] FF timing 4대 파라미터 (tsetup, thold, tpcq, tccq) 의미 [Ch10]
 - [ ] tpd vs tcd 차이 (propagation vs contamination) [Ch10]
+| **Sign-mag vs 1s comp vs 2s comp [Ch11]** | SM: 0두개,HW복잡 / 1s: 0두개,end-around carry | 2s: 0하나, HW단순, 가장 인기 |
+| **Biased vs 2s complement [Ch11]** | unsigned비교 가능, 지수필드용 | 덧셈/뺄셈 HW단순, 범용 정수 |
 - [ ] Metastability와 2-FF synchronizer [Ch10]
 - [ ] Timing path 4종류 (input→FF, FF→FF, FF→output, input→output) [Ch10]
 - [ ] 합성 시 #delay 무시, sensitivity list edge/level 혼용 금지 [Ch10]
+- [ ] 4가지 signed 표현: sign-mag, biased, 1s comp, 2s comp 각각의 장단점 [Ch11]
+- [ ] 2s complement: 비트반전+1, MSB 가중치 음수, 범위 비대칭 [Ch11]
+- [ ] Overflow 조건: cout⊕carry_into_sign=1 (5비트 예제 계산) [Ch11]
+- [ ] Biased 표현의 주 용도 (IEEE 754 지수 필드) [Ch11]
+- [ ] Signed-digit redundant 표현과 carry-free addition 원리 [Ch11]
+- [ ] Dot notation: posibit vs negabit [Ch11]
+- [ ] ulp, digit complement 정의 [Ch11]
