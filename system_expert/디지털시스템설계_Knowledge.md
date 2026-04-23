@@ -37,6 +37,10 @@
 | **[Ch8] Universal SR** | case({s1,s0}): 00=hold, 01=right, 10=left, 11=load | 4모드 시프트 레지스터 |
 | **[Ch8] LFSR** | d = ^(tap & qout); qout <= {d, qout[N-1:1]} | 의사 난수, 최대 주기 2ⁿ-1 |
 | **[Ch8] Signed cast** | $signed({1'b0, unsigned_val}) | unsigned→signed 변환 시 MSB에 0 추가 |
+| **[Ch10] Setup constraint** | Tc ≥ tpcq + tpd + tsetup | 최소 클럭 주기 결정 |
+| **[Ch10] Hold constraint** | tccq + tcd ≥ thold | 클럭 속도와 무관! |
+| **[Ch10] Setup w/ skew** | Tc ≥ tpcq + tpd + tsetup - δ | δ>0: 여유↑ |
+| **[Ch10] Hold w/ skew** | tccq + tcd ≥ thold + δ | δ>0: 위험↑ |
 
 ---
 
@@ -81,6 +85,9 @@
 | **ASIC vs FPGA [Ch9]** | NRE 높음, 단가 낮음, 성능 최고, 재수정 불가 | NRE 낮음, 단가 높음, 재프로그래밍, 프로토타이핑용 |
 | **ROM vs PLA vs PAL [Ch9]** | ROM: AND고정+OR프로그래밍 / PLA: 둘다 / PAL: AND프로그래밍+OR고정 | ROM 가장 유연(면적↑), PAL 저렴(제약↑) |
 | **LUT vs Gate [Ch9]** | LUT: 2ⁿ SRAM+MUX, 어떤 n-input 함수든 가능 | Gate: 특정 함수만 (AND/OR/XOR) |
+| **Setup vs Hold violation [Ch10]** | 클럭 느리게 해서 해결 가능 | 클럭 속도 무관, 버퍼 삽입 필요 |
+| **Positive vs Negative skew [Ch10]** | 수신 FF 늦게 받음, setup여유↑ hold위험↑ | 수신 FF 먼저 받음, setup여유↓ hold안전↑ |
+| **tpd vs tcd [Ch10]** | 최대 전파 지연 (worst-case) | 최소 오염 지연 (best-case) |
 
 ---
 
@@ -990,3 +997,12 @@ or  #(t_rise, t_fall, t_off) o1(f,b,c); // rise/fall/turn-off
 - [ ] CLB, IOB, Programmable Interconnect 역할 [Ch9]
 - [ ] Modern FPGA: 6-input LUT, DSP48, BRAM, SLICEM vs SLICEL [Ch9]
 - [ ] FPGA vs ASIC 장단점 비교 [Ch9]
+- [ ] Setup time constraint 수식: Tc ≥ tpcq + tpd + tsetup [Ch10]
+- [ ] Hold time constraint 수식: tccq + tcd ≥ thold [Ch10]
+- [ ] Clock skew 포함 수식 (positive/negative 각각) [Ch10]
+- [ ] Hold violation이 클럭 속도로 해결 안 되는 이유 [Ch10]
+- [ ] FF timing 4대 파라미터 (tsetup, thold, tpcq, tccq) 의미 [Ch10]
+- [ ] tpd vs tcd 차이 (propagation vs contamination) [Ch10]
+- [ ] Metastability와 2-FF synchronizer [Ch10]
+- [ ] Timing path 4종류 (input→FF, FF→FF, FF→output, input→output) [Ch10]
+- [ ] 합성 시 #delay 무시, sensitivity list edge/level 혼용 금지 [Ch10]
