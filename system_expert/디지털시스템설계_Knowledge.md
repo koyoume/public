@@ -44,6 +44,10 @@
 | **[Ch11] 2s complement** | N = -a_{n-1}·2^{n-1} + Σ a_i·2^i | MSB 가중치 음수 |
 | **[Ch11] 2s comp 변환** | 비트 반전 + 1 | 또는 M - Y (M=2^k) |
 | **[Ch11] Overflow** | cout ⊕ carry_into_sign = 1 | 동부호+결과부호≠ |
+| **[Ch12] CSA** | Sum=A⊕B⊕C, Carry=maj(A,B,C) | 3→2 compression, O(1) |
+| **[Ch12] Redundancy idx** | ρ = α + β + 1 - r | ρ>0이면 carry-free 가능 |
+| **[Ch12] RNS arithmetic** | |X+Y|_{m_i} = |x_i+y_i|_{m_i} | 모듈러스별 독립 연산 |
+| **[Ch12] RNS range** | M = m_N × ... × m_1 | pairwise coprime 조건 |
 
 ---
 
@@ -93,6 +97,8 @@
 | **tpd vs tcd [Ch10]** | 최대 전파 지연 (worst-case) | 최소 오염 지연 (best-case) |
 | **Sign-mag vs 1s comp vs 2s comp [Ch11]** | SM: 0두개,HW복잡 / 1s: 0두개,end-around carry | 2s: 0하나, HW단순, 가장 인기 |
 | **Biased vs 2s complement [Ch11]** | unsigned비교 가능, 지수필드용 | 덧셈/뺄셈 HW단순, 범용 정수 |
+| **CSA vs Ripple Carry [Ch12]** | 3→2 축소, O(1), carry 미전파 | carry 전파 O(k), 최종 합 계산용 |
+| **RNS vs Positional [Ch12]** | +/×carry-free, ÷/비교 어려움 | +carry O(k), ÷/비교 쉬움 |
 
 ---
 
@@ -1010,6 +1016,8 @@ or  #(t_rise, t_fall, t_off) o1(f,b,c); // rise/fall/turn-off
 - [ ] tpd vs tcd 차이 (propagation vs contamination) [Ch10]
 | **Sign-mag vs 1s comp vs 2s comp [Ch11]** | SM: 0두개,HW복잡 / 1s: 0두개,end-around carry | 2s: 0하나, HW단순, 가장 인기 |
 | **Biased vs 2s complement [Ch11]** | unsigned비교 가능, 지수필드용 | 덧셈/뺄셈 HW단순, 범용 정수 |
+| **CSA vs Ripple Carry [Ch12]** | 3→2 축소, O(1), carry 미전파 | carry 전파 O(k), 최종 합 계산용 |
+| **RNS vs Positional [Ch12]** | +/×carry-free, ÷/비교 어려움 | +carry O(k), ÷/비교 쉬움 |
 - [ ] Metastability와 2-FF synchronizer [Ch10]
 - [ ] Timing path 4종류 (input→FF, FF→FF, FF→output, input→output) [Ch10]
 - [ ] 합성 시 #delay 무시, sensitivity list edge/level 혼용 금지 [Ch10]
@@ -1020,3 +1028,11 @@ or  #(t_rise, t_fall, t_off) o1(f,b,c); // rise/fall/turn-off
 - [ ] Signed-digit redundant 표현과 carry-free addition 원리 [Ch11]
 - [ ] Dot notation: posibit vs negabit [Ch11]
 - [ ] ulp, digit complement 정의 [Ch11]
+- [ ] CSA 동작: 3개수→2개수, Full Adder 배열, carry 미전파 [Ch12]
+- [ ] Redundancy index ρ 계산과 carry-free 조건 [Ch12]
+- [ ] RNS 기본: coprime 모듈러스, 산술 독립성, dynamic range [Ch12]
+- [ ] Binary→RNS 변환 (|2^i mod m| 테이블) [Ch12]
+- [ ] RNS→Decimal 변환 (CRT) [Ch12]
+- [ ] RNS→MRS 변환 (곱셈 역원 반복) [Ch12]
+- [ ] Low-cost moduli (2^a, 2^a-1) 선택 전략 [Ch12]
+- [ ] Carry-save→binary 변환 (decompose+add 또는 순차 carry) [Ch12]
