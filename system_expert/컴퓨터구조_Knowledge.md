@@ -107,15 +107,19 @@
 | Basic Block | 중간에 분기 없고 분기대상도 처음뿐인 명령어 시퀀스. 최적화 기본 단위 |
 | Cache Memory | CPU 내/근처 소형 고속 SRAM. 메인메모리 접근 지연 감소 |
 | Cache Coherence | 멀티프로세서 공유 데이터 일관성. Snooping(버스 감시)/Directory(상태 기록) |
+| Coherence vs Consistency | Coherence: 같은 주소의 읽기가 최신 쓰기 값을 반환. Consistency: 서로 다른 주소의 쓰기가 다른 프로세서에 보이는 순서 규칙 |
 | CAPEX (Capital Expenditure) | 자본적 지출. 서버·장비·인프라 등 초기 구매/구축 비용. 일회성 투자 |
 | CISC (Complex Instruction Set Computer) | 복잡·다양·가변길이 명령어. x86 대표 |
 | CPI (Cycles Per Instruction) | 명령어당 평균 클럭 사이클. CPU HW와 명령어 mix에 의해 결정 |
 | Datapath | 프로세서 내부 데이터 연산 유닛 (ALU, 레지스터) |
 | Denormal Number | Exponent=0일 때 hidden bit=0. 정규화 수보다 더 작은 값 표현. Gradual underflow 허용 |
 | Control | 명령어 해석(decode) → Datapath에 제어 신호 |
+| Chaining | 벡터 프로세서에서 한 벡터 연산의 결과를 다음 연산의 입력으로 직접 전달. 스칼라 forwarding의 벡터 버전. 원소 단위로 파이프라인 연결하여 전체 완료를 기다리지 않음 |
 | Design Principle 1 | Simplicity favors regularity |
 | Design Principle 2 | Smaller is faster |
 | Design Principle 3 | Good design demands good compromises |
+| DLP (Data-Level Parallelism) | 같은 연산을 여러 데이터에 동시 적용. SIMD, Vector, GPU가 활용. 배열/행렬/이미지 처리에 풍부. Flynn SIMD |
+| DMA (Direct Memory Access) | CPU 거치지 않고 메모리↔I/O 간 직접 전송. CPU는 전송 중 다른 일 수행 가능. GPU↔Host 대량 전송에 사용 |
 | Dynamic Linking | 호출 시점에만 라이브러리 로드. Lazy Linkage |
 | Exception | CPU 내부에서 발생하는 예외(undefined opcode, overflow, syscall). SEPC/SCAUSE에 기록 후 handler로 점프 |
 | Forwarding (Bypassing) | 파이프라인에서 결과가 나오면 레지스터 write 전에 바로 다음 명령어 입력으로 전달. Data hazard 해결 |
@@ -123,6 +127,7 @@
 | Hazard | 파이프라인에서 다음 명령어를 즉시 시작하지 못하게 하는 상황. Structural/Data/Control 3종류 |
 | IC (Instruction Count) | 프로그램 실행 시 총 명령어 수 |
 | IEEE 754 | 부동소수점 표현 및 연산의 국제 표준. Single(32-bit), Double(64-bit). Bias, hidden bit, 특수값(±0, ±Inf, NaN, Denormal) 정의 |
+| ILP (Instruction-Level Parallelism) | 단일 프로그램 내 여러 명령어를 동시 실행. Pipeline, OoO, VLIW로 활용. HW가 자동 추출. 의존성이 한계 결정 |
 | Infinity (±∞) | Exp=111...1, Frac=000...0. 오버플로우 시 사용. 후속 계산에 전파 가능 |
 | ISA (Instruction Set Architecture) | HW/SW 인터페이스. 프로세서가 이해하는 명령어 집합 정의 |
 | ILP (Instruction-Level Parallelism) | 파이프라인/다중 발행으로 여러 명령어를 동시 실행하는 병렬성 |
@@ -151,6 +156,7 @@
 | Sign Extension | 넓은 비트 확장 시 부호비트 복제. lb(sign), lbu(zero) |
 | SPEC (Standard Performance Evaluation Corporation) | Standard Performance Evaluation Corp. 기하평균 벤치마크 |
 | Stored Program | 명령어도 이진수로 메모리 저장. 프로그램이 프로그램 조작 가능 |
+| TLP (Thread-Level Parallelism) | 여러 스레드를 동시 실행. 멀티코어, SMT가 활용. 프로그래머가 명시적 병렬화 필요(OpenMP, pthread). Flynn MIMD |
 | TLB (Translation Lookaside Buffer) | CPU 내 PTE 캐시. 주소 변환 가속. hit 0.5~1cy, miss 10~100cy |
 | TPU (Tensor Processing Unit) | Google 개발 AI/ML 전용 ASIC. Systolic Array로 행렬 곱셈 특화. GPU보다 전력 효율↑. Domain-Specific Architecture(DSA)의 대표 사례 |
 | Virtual Memory | 메인메모리를 디스크의 캐시로 사용. 프로그램별 가상 주소 공간, 보호, Page Table로 변환 |
@@ -187,15 +193,21 @@
 | MTTF (Mean Time To Failure) | Mean Time To Failure. 평균 고장 시간 (신뢰성 지표) |
 | MTTR (Mean Time To Repair) | Mean Time To Repair. 평균 수리 시간 |
 | NFC (Near Field Communication) | Near Field Communication. 근거리 무선 통신 |
+| Network Topology | 네트워크의 물리적 연결 구조. Bus/Ring/2D Mesh/Hypercube/Fat Tree/Fully Connected. Bisection BW가 핵심 성능 지표 |
+| Routing | 메시지의 소스→목적지 경로 결정. Deterministic(고정)/Adaptive(동적). Deadlock-free 보장 필요 (dimension-order 등) |
+| Flow Control | 네트워크 내 버퍼·대역폭 할당 방식. Circuit/Packet switching. Store-and-forward/Cut-through(wormhole). Credit-based로 overflow 방지 |
 | OoO (Out-of-Order Execution) | Out-of-Order execution. 의존성 없는 명령어를 프로그램 순서와 무관하게 먼저 실행. Reservation Station+ROB+Register Renaming으로 구현 |
 | In-Order Commit | OoO 실행 결과를 ROB를 통해 반드시 프로그램 순서대로 확정(commit). Precise Exception과 Speculation rollback을 가능하게 하는 핵심 원칙 |
 | ROB (Reorder Buffer) | OoO 프로세서에서 명령어 결과를 프로그램 순서대로 보관하는 버퍼. Head부터 순차 commit하여 in-order commit 보장. 예측 실패 시 flush로 rollback |
 | OS (Operating System) | Operating System. I/O·메모리·스케줄링 관리 시스템 소프트웨어 |
+| PLP (Pipeline-Level Parallelism) | 작업을 여러 단계로 나누어 각 단계를 동시 처리. 5-stage RISC-V 파이프라인이 대표적. ILP의 기반 |
 | PC (Program Counter) | Program Counter. 현재/다음 실행 명령어 주소 저장 레지스터 |
 | PMD (Personal Mobile Device) | Personal Mobile Device. 배터리 구동 모바일 장치 (스마트폰, 태블릿) |
 | PTE (Page Table Entry) | Page Table Entry. 가상→물리 페이지 매핑 정보 (valid/dirty/reference bit) |
 | QDR (Quad Data Rate) | Quad Data Rate. DDR보다 높은 BW의 DRAM (별도 DDR 입출력) |
+| RLP (Request-Level Parallelism) | 독립적 요청들을 병렬 처리. 웹서버 HTTP 요청, DB 쿼리 등. WSC/클라우드에서 가장 중요. 통신 오버헤드 최소→확장성 최고 |
 | RISC (Reduced Instruction Set Computer) | Reduced Instruction Set Computer. 단순·규칙·고정길이 ISA 설계 철학 |
+| Scatter-Gather | 벡터 프로세서에서 비연속 메모리 접근 처리. Gather: 인덱스가 가리키는 흩어진 위치에서 모아 로드. Scatter: 흩어진 위치에 저장. Sparse matrix/indirect addressing에 필수 |
 | SCAUSE (Supervisor Exception Cause Register) | Supervisor Exception Cause Register. RISC-V 예외 원인 코드 저장 |
 | SDC (Silent Data Corruption) | 데이터 손상이 발생했으나 시스템이 감지하지 못하는 상황. ECC 범위를 초과하는 다중 비트 에러 등으로 발생. 잘못된 결과가 조용히 전파되어 치명적 |
 | SEC/DEC (Single Error Correction / Double Error Detection) | Single Error Correction / Double Error Detection. Hamming 코드 기반 |
@@ -207,6 +219,8 @@
 | SRAM (Static Random Access Memory) | Static RAM. 빠르고 비쌈. 캐시에 사용 |
 | SRT (Sweeney-Robertson-Tocher) | Sweeney-Robertson-Tocher. 고속 나눗셈 알고리즘 (여러 몫 비트/단계) |
 | SSE (Streaming SIMD Extensions) | Streaming SIMD Extensions. x86 128-bit SIMD 확장 |
+| Strong Scaling | 문제 크기 고정, 프로세서 수 증가. Amdahl 적용→순차 부분이 한계. "같은 문제를 더 빨리" |
+| Weak Scaling | 프로세서에 비례하여 문제도 키움. 선형 확장 가능. "더 큰 문제를 같은 시간에" |
 | UMA (Uniform Memory Access) | Uniform Memory Access. 모든 프로세서 메모리 접근 시간 동일 |
 | VLIW (Very Long Instruction Word) | Very Long Instruction Word. 컴파일러가 여러 연산을 하나의 긴 명령어로 패킹 |
 | VMM (Virtual Machine Monitor) | Virtual Machine Monitor. 가상→물리 자원 매핑 (하이퍼바이저) |
