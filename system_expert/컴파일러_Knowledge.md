@@ -1,6 +1,6 @@
 # 컴파일러 Knowledge
 
-> 삼성DS 시스템 전문가 과정 — 컴파일러 (문수묵 교수) | 마지막 업데이트: Ch1~9,11
+> 삼성DS 시스템 전문가 과정 — 컴파일러 (문수묵 교수) | 마지막 업데이트: Ch1~11
 
 ---
 
@@ -1770,6 +1770,80 @@ Top-down(AEAP): 빠른 시작, 레지스터 수명 길어짐
 Bottom-up(ALAP): 수명 짧음, expression tree 유리
 RA 순서: pre-RA(자유도 높) -> RA -> post-RA(spill 반영)
 Integrated: 레지스터 여유시 병렬성, 부족시 수명축소 우선
+```
+
+---
+
+### Ch10. Software Pipelining
+
+#### 10-1. 개념과 동기
+
+```
+루프의 서로 다른 반복을 겹쳐 실행 (CPU 파이프라인과 같은 개념을 SW로)
+
+예: A[i]=A[i]*b+c, MEM1+ALU1 머신
+  한 반복: Read(1cyc)→Mul(2cyc)→Add(2cyc)→Write(1cyc) = 6cyc/iter
+  최적(자원 기준): MEM 2개+ALU 2개 → 2cyc/iter 가능
+  
+  SW 파이프라이닝 Kernel:
+    cyc A: [Add(i)]   [Read(i+2)]   ← MEM+ALU 동시!
+    cyc B: [Write(i)] [Mul(i+1)]    ← MEM+ALU 동시!
+    → II=2cyc/iter = 최적!
+```
+
+#### 10-2. 파이프라인 루프 구조
+
+```
+  Prolog:  파이프라인 채움 (점진적 겹침 시작)
+  Kernel:  정상 상태 (매 II사이클마다 1반복 완료, 반복)
+  Epilog:  파이프라인 비움 (마지막 반복들 완료)
+
+  II (Initiation Interval) = Kernel 사이클 길이 = 반복 시작 간격
+  II가 작을수록 성능 좋음
+```
+
+#### 10-3. Unrolling vs SW Pipelining
+
+```
+Unrolling: 실행시간 = 4+2u (u번 unroll). 코드 u배 증가. 효율90%→u=18
+SW Pipeline: II=2 최적 도달. 코드 2~3배만 증가. Unrolling보다 우수.
+```
+
+#### 10-4. Modulo Scheduling
+
+```
+MII = max(RMII, PMII)
+
+RMII = max(ri/Ri): 각 자원별 (사용량/CPU보유량)의 최대
+  예: ALU4개/CPU2개=2, MEM3개/CPU1개=3 → RMII=3
+
+PMII = max(sum(d)/sum(p)): 의존성 그래프 사이클별
+  간선 <p,d>: p=반복간격, d=지연. 사이클의 d합/p합
+
+알고리즘:
+  1. II=MII로 시작
+  2. Modulo Reservation Table에 배정 시도
+  3. 성공→확정, 실패→II++로 재시도
+```
+
+**[예시문제]** 2-ALU+1-MEM 머신, 한 반복에 ALU 4개+MEM 2개. RMII는?
+
+**[풀이]**: RMII(ALU)=4/2=2, RMII(MEM)=2/1=2 → RMII=2
+
+#### 10-5. Modulo Variable Expansion + Rotating Register
+
+```
+수명>II인 변수: 다음 반복에서 덮어쓰기 위험
+→ 여러 레지스터 할당 + 커널 unroll
+또는: Rotating Register (Itanium) — HW가 자동 시프트, unroll 불필요
+```
+
+#### 10-6. EPS (Enhanced Pipeline Scheduling)
+
+```
+MS와 다른 접근: 원래 루프 유지, DAG 스케줄링 반복 적용
+코드가 백엣지 넘어 이동 → 파이프라이닝 효과
+장점: 임의 제어흐름/비상수 반복수/outer loop/variable II 처리 가능
 ```
 
 ## ⑤ 시험 대비 체크리스트
