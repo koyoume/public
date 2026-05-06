@@ -40,6 +40,7 @@
 | `Block_addr = floor(Byte_addr / Block_size)` | 블록 주소 | Offset = Byte_addr mod Block_size | |
 | `Speedup_parallel = 1/((1-F)+F/N)` | Amdahl 병렬 버전 | F=병렬화 비율, N=프로세서 수 | F→1이어야 고속화 |
 | `Attainable GFLOP = Min(BW×AI, Peak)` | Roofline 모델 | BW=메모리대역폭, AI=FLOPs/Byte | AI 낮으면 memory bound |
+| `Buffer Size = Bandwidth × Latency` | Little's Law | BW를 100% 활용하려면 이만큼의 in-flight 요청 필요 | GPU 대규모 스레드의 이론적 근거 |
 
 ---
 
@@ -90,6 +91,8 @@
 | CPU vs GPU | 큰 캐시, coherent, 다양한 워크로드 | 작은 캐시, 대규모 스레드, 높은 BW | GPU: data-parallel에 강점. CPU: 순차+분기에 강점 |
 | Vector vs SIMD(SSE/AVX) | 가변 폭, strided 접근, 컴파일러 친화 | 고정 폭(128/256b), stride 미지원 | Vector가 더 일반적, SIMD는 ad-hoc |
 | Memory bound vs Compute bound | AI < 교차점 (메모리 BW 제한) | AI > 교차점 (FP 성능 제한) | Roofline 모델로 판별. 최적화 방향이 다름 |
+| FEC vs ARQ | 수신 측이 자체 정정(재전송 불필요) | 에러 검출 시 재전송 요청 | FEC: 메모리/위성/실시간. ARQ: 네트워크(TCP) |
+| Detected Error vs SDC | ECC 등이 에러를 검출→정정/재시도 | 에러가 검출 안 됨→잘못된 결과 전파 | SDC가 더 위험 (crash보다 silent corruption) |
 
 ---
 
@@ -125,6 +128,7 @@
 | ILP (Instruction-Level Parallelism) | 파이프라인/다중 발행으로 여러 명령어를 동시 실행하는 병렬성 |
 | IPC (Instructions Per Cycle) | 사이클당 명령어 수. CPI<1일 때(multiple issue) 사용. IPC=1/CPI |
 | Little Endian | 최하위 바이트가 가장 낮은 주소. RISC-V 사용 |
+| Little's Law | Buffer Size = Bandwidth × Latency. 메모리 BW를 100% 활용하려면 latency 동안 충분한 in-flight 요청이 필요. GPU가 수천 스레드를 유지하는 이론적 근거 |
 | Locality | Temporal(최근→재접근) + Spatial(인접→접근). 메모리 계층의 이론적 근거 |
 | MIMD (Multiple Instruction Multiple Data) | Multiple Instruction Multiple Data. 여러 프로세서가 독립 명령어로 독립 데이터 처리. 멀티코어 |
 | NUMA (Non-Uniform Memory Access) | Non-Uniform Memory Access. 로컬 메모리가 더 빠른 공유 메모리 구조. Memory affinity 중요 |
@@ -168,6 +172,7 @@
 | DGEMM (Double-precision General Matrix Multiply) | Double-precision General Matrix Multiply. 행렬 곱셈 벤치마크 커널 |
 | DRAM (Dynamic Random Access Memory) | Dynamic RAM. 커패시터 전하 저장, refresh 필요. 메인 메모리 |
 | ECC (Error Correcting Code) | Error Correcting Code. 메모리 오류 검출/정정 코드 (SEC/DEC 등) |
+| FEC (Forward Error Correction) | 수신 측이 재전송 없이 자체 에러 정정. 송신 시 중복 정보(redundancy) 추가. ECC(Hamming SEC/DEC)가 대표적 FEC. "Dependability via Redundancy"의 구현 |
 | FP (Floating Point) | Floating Point. 부동소수점. IEEE 754로 실수 표현 |
 | FPU (Floating Point Unit) | Floating Point Unit. 부동소수점 연산 전용 HW 유닛 |
 | FSM (Finite State Machine) | Finite State Machine. 유한 상태 기계. 캐시 컨트롤러 등 제어 로직 구현 |
@@ -192,6 +197,7 @@
 | QDR (Quad Data Rate) | Quad Data Rate. DDR보다 높은 BW의 DRAM (별도 DDR 입출력) |
 | RISC (Reduced Instruction Set Computer) | Reduced Instruction Set Computer. 단순·규칙·고정길이 ISA 설계 철학 |
 | SCAUSE (Supervisor Exception Cause Register) | Supervisor Exception Cause Register. RISC-V 예외 원인 코드 저장 |
+| SDC (Silent Data Corruption) | 데이터 손상이 발생했으나 시스템이 감지하지 못하는 상황. ECC 범위를 초과하는 다중 비트 에러 등으로 발생. 잘못된 결과가 조용히 전파되어 치명적 |
 | SEC/DEC (Single Error Correction / Double Error Detection) | Single Error Correction / Double Error Detection. Hamming 코드 기반 |
 | SEPC (Supervisor Exception Program Counter) | Supervisor Exception PC. RISC-V 예외 발생 명령어의 PC 저장 |
 | SM (Streaming Multiprocessor) | Streaming Multiprocessor. GPU 내 여러 SP를 묶은 처리 유닛 (NVIDIA) |
