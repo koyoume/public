@@ -1,6 +1,6 @@
 # 컴파일러 Knowledge
 
-> 삼성DS 시스템 전문가 과정 — 컴파일러 (문수묵 교수) | 마지막 업데이트: Ch1~8,11
+> 삼성DS 시스템 전문가 과정 — 컴파일러 (문수묵 교수) | 마지막 업데이트: Ch1~9,11
 
 ---
 
@@ -1716,6 +1716,60 @@ COPY x,y에서 x,y 비간섭 → 합쳐서 같은 레지스터 → COPY 삭제
 Caller-save: 호출자 저장. 호출 경계 안 넘는 변수에 배정.
 Callee-save: 피호출자 저장(entry/exit 1번). 호출 넘는 변수에 배정.
 Pre-colored: SP,FP,GP,인자,리턴값 등 미리 고정된 물리 레지스터.
+```
+
+---
+
+### Ch9. Instruction Scheduling
+
+#### 9-1. 스케줄링이란
+
+```
+독립적 명령어를 재배치하여 파이프라인 활용 극대화, stall 제거
+Parallel group: 매 사이클 독립 명령어를 묶어 동시 실행
+```
+
+#### 9-2. 두 가지 제약
+
+```
+(1) 자원 제약: 매 사이클 실행 유닛 수 제한 (예: ALU 1 + MEM 1)
+(2) 의존성 제약:
+  True (RAW): write->read. 진짜. delay>0
+  Anti (WAR): read->write. 이름 충돌. delay=0 (같은 사이클 병렬 가능)
+  Output (WAW): write->write. 이름 충돌.
+  Anti/Output는 renaming으로 해소 가능
+```
+
+#### 9-3. 의존성 극복
+
+```
+제어 의존성 -> Speculative code motion
+  3조건: 정확성(새변수), 예외무발생, 영구변경안함(store불가)
+Anti/Output -> On-demand renaming (새 이름 도입)
+메모리 -> Memory disambiguation (No/Yes/Maybe)
+```
+
+#### 9-4. List Scheduling
+
+```
+1. DAG 구성: 노드=명령어, 간선=의존성(delay)
+2. READY = 선행자 0인 노드
+3. READY에서 우선순위 최고 선택 -> 가장 빠른 슬롯 배정
+4. 우선순위: critical path > delay > source order
+NP-complete -> 휴리스틱 (backtrack 안 함)
+```
+
+**[예시문제]** i1:LD r2=9(r1), i2:ST r4,0(r3), i3:ADD r4=r4,r3, i4:ADD r1=r5,r4, i5:ADD r6=r2,r4 스케줄 (ALU1+MEM1, LD=2cyc).
+
+**[풀이]**: DAG: i1->(2)i5, i2->(0)i3, i3->(1){i4,i5}, i1->(0)i4. Cyc1:[MEM:i1, ALU:i3]. Cyc2:[MEM:i2, ALU:i4]. Cyc3:[ALU:i5].
+
+#### 9-5. 방향과 RA 상호작용
+
+```
+Top-down(AEAP): 빠른 시작, 레지스터 수명 길어짐
+Bottom-up(ALAP): 수명 짧음, expression tree 유리
+RA 순서: pre-RA(자유도 높) -> RA -> post-RA(spill 반영)
+Integrated: 레지스터 여유시 병렬성, 부족시 수명축소 우선
 ```
 
 ## ⑤ 시험 대비 체크리스트
