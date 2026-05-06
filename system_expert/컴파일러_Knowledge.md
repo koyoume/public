@@ -1781,9 +1781,12 @@ Integrated: 레지스터 여유시 병렬성, 부족시 수명축소 우선
 ```
 루프의 서로 다른 반복을 겹쳐 실행 (CPU 파이프라인과 같은 개념을 SW로)
 
-예: A[i]=A[i]*b+c, MEM1+ALU1 머신
-  한 반복: Read(1cyc)→Mul(2cyc)→Add(2cyc)→Write(1cyc) = 6cyc/iter
-  최적(자원 기준): MEM 2개+ALU 2개 → 2cyc/iter 가능
+머신: 매 사이클 MEM 1개(1cyc) + ALU 1개(2cyc) 동시 실행 가능
+  (같은 종류 2개 동시 불가: ALU+ALU 불가, MEM+MEM 불가)
+
+예: A[i]=A[i]*b+c
+  한 반복: Read(MEM,1cyc)→Mul(ALU,2cyc)→Add(ALU,2cyc)→Write(MEM,1cyc) = 6cyc
+  자원: MEM 2회(Read+Write) + ALU 2회(Mul+Add) → 최소 2cyc/iter
   
   SW 파이프라이닝 Kernel:
     cyc A: [Add(i)]   [Read(i+2)]   ← MEM+ALU 동시!
