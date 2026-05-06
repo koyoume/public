@@ -1781,8 +1781,10 @@ Integrated: 레지스터 여유시 병렬성, 부족시 수명축소 우선
 ```
 루프의 서로 다른 반복을 겹쳐 실행 (CPU 파이프라인과 같은 개념을 SW로)
 
-머신: 매 사이클 MEM 1개(1cyc) + ALU 1개(2cyc) 동시 실행 가능
-  (같은 종류 2개 동시 불가: ALU+ALU 불가, MEM+MEM 불가)
+머신: 매 사이클 MEM 1개 + ALU 1개 동시 시작 가능
+  MEM: latency=1cyc
+  ALU: latency=2cyc, 파이프라인됨 (매 사이클 새 연산 시작 가능, 결과는 2cyc 후)
+  → 서로 다른 연산의 ALU 실행이 겹칠 수 있음 (throughput=1op/cyc)
 
 예: A[i]=A[i]*b+c
   한 반복: Read(MEM,1cyc)→Mul(ALU,2cyc)→Add(ALU,2cyc)→Write(MEM,1cyc) = 6cyc
