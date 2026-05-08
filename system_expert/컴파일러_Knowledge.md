@@ -1,6 +1,6 @@
 # 컴파일러 Knowledge
 
-> 삼성DS 시스템 전문가 과정 — 컴파일러 (문수묵 교수) | 마지막 업데이트: Ch1~11
+> 삼성DS 시스템 전문가 과정 — 컴파일러 (문수묵 교수) | 마지막 업데이트: Ch1~13
 
 ---
 
@@ -1849,6 +1849,85 @@ PMII = max(sum(d)/sum(p)): 의존성 그래프 사이클별
 MS와 다른 접근: 원래 루프 유지, DAG 스케줄링 반복 적용
 코드가 백엣지 넘어 이동 → 파이프라이닝 효과
 장점: 임의 제어흐름/비상수 반복수/outer loop/variable II 처리 가능
+```
+
+---
+
+### Ch12. VM, Interpreter, JIT Compiler
+
+#### 12-1. 인터프리터
+
+```
+D-a-D (Decode-and-Dispatch): while 루프 + switch/case
+  문제: 간접 분기 2개/바이트코드 -> CPU 분기예측 실패 -> 느림
+
+Threaded Interpretation: 각 루틴 끝에서 다음 루틴으로 직접 goto
+  dispatch table로 주소 조회 -> 간접 분기 1개로 줄임 -> 50%+ 개선
+```
+
+#### 12-2. JIT (Just-in-Time) Compilation
+
+```
+바이트코드를 런타임에 기계어로 변환
+핵심: hot 코드만 컴파일 (Hotspot Detection)
+  -> 컴파일 오버헤드 vs 실행 속도 이득의 트레이드오프
+RA: Graph Coloring 대신 Linear Scan (빠르지만 덜 최적)
+코드 캐시에 저장하여 재사용
+```
+
+#### 12-3. Multi-tier Architecture (JS 엔진)
+
+```
+1st Tier(cold): Parse -> 바이트코드 -> 인터프리터 (빠른 시작)
+2nd Tier(warm): Baseline JIT (1:1 변환, 프로파일링 수집)
+3rd Tier(hot):  Optimizing JIT (프로파일 기반 CSE/DCE/CF/RA)
+                코드 크기 0.32배, 가장 빠름
+Deoptimization: 가정 깨지면 baseline으로 되돌아감
+```
+
+#### 12-4. Profile-based Optimization
+
+```
+동적 타입 언어: 런타임 프로파일로 타입/값 추측
+  -> 타입 특화 코드 생성 (int add vs double add vs generic)
+  -> 상수 전파 (glob=항상 1이면 1로 치환)
+  -> 가정 깨지면 deoptimization handler로 점프
+```
+
+---
+
+### Ch13. Compiler-Friendly Programming
+
+#### 13-1. 프로그래머 LICM
+
+```
+예: for(i=0;i<strlen(s);i++) -> strlen()이 매 반복 O(N) -> 전체 O(N^2)!
+수정: int len=strlen(s); for(i=0;i<len;i++) -> O(N)
+왜 컴파일러가 못 하나? 함수=블랙박스, 부작용 가능성 -> LICM 불가
+```
+
+#### 13-2. Optimization Blocker #1: 함수 호출
+
+```
+컴파일러는 함수를 블랙박스로 취급 -> 부작용 가정 -> 최적화 제한
+해결: inline 함수 사용 (GCC -O1), 프로그래머가 직접 코드 이동
+```
+
+#### 13-3. Optimization Blocker #2: Memory Aliasing
+
+```
+예: b[i]+=a[i*n+j] -> a,b가 같은 메모리 가리킬 수 있음 (aliasing)
+    -> 컴파일러가 b[i]를 지역변수로 교체 못 함
+해결: 프로그래머가 지역변수에 누적 후 최종 저장
+    double val=0; val+=a[..]; b[i]=val;
+```
+
+#### 13-4. 성능 비교
+
+```
+combine1(무최적화): 22.68  combine1(-O1): 10.12  combine4(프로그래머): 1.27
+-> 프로그래머 최적화로 추가 4~8배 개선!
+핵심: vec_length 밖으로, bounds check 제거, 지역변수 누적, 포인터 직접접근
 ```
 
 ## ⑤ 시험 대비 체크리스트
