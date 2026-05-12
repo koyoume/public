@@ -175,6 +175,7 @@
 | BHT (Branch History Table) | Branch History Table. 분기 예측용 최근 분기 결과 기록 테이블 |
 | BTB (Branch Target Buffer) | Branch Target Buffer. 분기 타겟 주소 캐싱. taken branch fetch 지연 제거 |
 | CMOS (Complementary Metal-Oxide-Semiconductor) | Complementary MOS. 현대 IC 제조 기본 기술. Power = C×V²×f |
+| CMP (Chip Multiprocessor) | 하나의 칩에 여러 프로세서 코어를 집적한 구조(=멀티코어). Power Wall 대안. 칩 내 통신으로 저지연·고대역폭. LLC를 코어 간 공유 |
 | CPU (Central Processing Unit) | Central Processing Unit. Datapath + Control로 구성 |
 | CUDA (Compute Unified Device Architecture) | Compute Unified Device Architecture. NVIDIA GPGPU 플랫폼/언어 |
 | DAXPY (Double-precision A×X Plus Y) | Double-precision A×X Plus Y. 벡터 연산 벤치마크 (Y = a×X+Y) |
@@ -185,6 +186,7 @@
 | FEC (Forward Error Correction) | 수신 측이 재전송 없이 자체 에러 정정. 송신 시 중복 정보(redundancy) 추가. ECC(Hamming SEC/DEC)가 대표적 FEC. "Dependability via Redundancy"의 구현 |
 | FP (Floating Point) | Floating Point. 부동소수점. IEEE 754로 실수 표현 |
 | FPU (Floating Point Unit) | Floating Point Unit. 부동소수점 연산 전용 HW 유닛 |
+| FLOPS (Floating Point Operations Per Second) | 초당 부동소수점 연산 수. 과학/공학 성능 핵심 지표. GFLOPS/TFLOPS/PFLOPS. Roofline Y축. Peak = 코어수×클럭×FP ops/cycle. 실제는 memory bound로 peak 미달 가능 |
 | FSM (Finite State Machine) | Finite State Machine. 유한 상태 기계. 캐시 컨트롤러 등 제어 로직 구현 |
 | FTL (Flash Translation Layer) | Flash Translation Layer. 플래시 wear leveling + 논리-물리 주소 매핑 |
 | HLL (High-Level Language) | High-Level Language. 고수준 프로그래밍 언어 (C, Java, Python) |
