@@ -132,6 +132,9 @@
 | ISA (Instruction Set Architecture) | HW/SW 인터페이스. 프로세서가 이해하는 명령어 집합 정의 |
 | ILP (Instruction-Level Parallelism) | 파이프라인/다중 발행으로 여러 명령어를 동시 실행하는 병렬성 |
 | IPC (Instructions Per Cycle) | 사이클당 명령어 수. CPI<1일 때(multiple issue) 사용. IPC=1/CPI |
+| IF/ID/EX/MEM/WB | RISC-V 5-stage 파이프라인 단계. IF(Instruction Fetch)→ID(Decode+Reg Read)→EX(ALU/주소계산)→MEM(Data Memory)→WB(Write Back). 단계 간 Pipeline Register로 데이터 전달 |
+| LLC (Last Level Cache) | 캐시 계층의 마지막 레벨(보통 L3). LLC miss → DRAM 접근(수백 cycle). 멀티코어에서 코어 간 공유. 메인 메모리 접근 최소화의 마지막 방어선 |
+| LLM (Large Language Model) | 대규모 언어 모델(GPT, Claude 등). Transformer 기반. 행렬 곱셈(GEMM) 지배적 워크로드. TPU/GPU 수요 폭증의 원인. NVIDIA 시가총액 1위의 배경 |
 | Little Endian | 최하위 바이트가 가장 낮은 주소. RISC-V 사용 |
 | Little's Law | Buffer Size = Bandwidth × Latency. 메모리 BW를 100% 활용하려면 latency 동안 충분한 in-flight 요청이 필요. GPU가 수천 스레드를 유지하는 이론적 근거 |
 | Locality | Temporal(최근→재접근) + Spatial(인접→접근). 메모리 계층의 이론적 근거 |
@@ -153,6 +156,7 @@
 | SPMD (Single Program Multiple Data) | Single Program Multiple Data. MIMD에서 같은 프로그램을 조건문으로 분기. 가장 흔한 병렬 모델 |
 | Saturating Operation | 오버플로우 시 wrap-around 대신 최대/최소값으로 고정. 오디오/비디오 처리에 사용 |
 | SIMD (Single Instruction Multiple Data) | Single Instruction Multiple Data. 하나의 명령어로 여러 데이터를 동시 처리. SSE/AVX가 대표적 |
+| SIMT (Single Instruction Multiple Threads) | NVIDIA GPU 실행 모델. Warp(32 threads)가 같은 명령어 실행. SIMD와 달리 스레드별 독립 PC/분기 가능. Divergence 시 마스크+순차 처리로 성능↓ |
 | Sign Extension | 넓은 비트 확장 시 부호비트 복제. lb(sign), lbu(zero) |
 | SPEC (Standard Performance Evaluation Corporation) | Standard Performance Evaluation Corp. 기하평균 벤치마크 |
 | Stored Program | 명령어도 이진수로 메모리 저장. 프로그램이 프로그램 조작 가능 |
@@ -184,6 +188,7 @@
 | FSM (Finite State Machine) | Finite State Machine. 유한 상태 기계. 캐시 컨트롤러 등 제어 로직 구현 |
 | FTL (Flash Translation Layer) | Flash Translation Layer. 플래시 wear leveling + 논리-물리 주소 매핑 |
 | HLL (High-Level Language) | High-Level Language. 고수준 프로그래밍 언어 (C, Java, Python) |
+| HDD (Hard Disk Drive) | 회전 자기 디스크 비휘발성 저장장치. 접근 수 ms(Seek+Rotational+Transfer). 가장 저렴($0.05~0.1/GB). 메모리 계층 최하단 |
 | HT (Hyper-Threading) | Hyper-Threading. Intel의 SMT 구현 (1코어 2스레드 동시 실행) |
 | LAN (Local Area Network) | Local Area Network. 건물 내 근거리 네트워크 (Ethernet) |
 | LRU (Least Recently Used) | Least Recently Used. 가장 오래 안 쓴 항목을 교체하는 정책 |
@@ -217,12 +222,14 @@
 | SoC (System on Chip) | System on Chip. CPU+GPU+NPU+MemCtrl 등 단일 칩 집적 |
 | SP (Streaming Processor) | Streaming Processor. GPU 내 기본 연산 유닛 (NVIDIA) |
 | SRAM (Static Random Access Memory) | Static RAM. 빠르고 비쌈. 캐시에 사용 |
+| SSD (Solid State Drive) | NAND Flash 기반 비휘발성 저장장치. 기계적 부품 없음. 접근 수십 µs(HDD의 100~1000× 빠름). Wear out→FTL로 wear leveling |
 | SRT (Sweeney-Robertson-Tocher) | Sweeney-Robertson-Tocher. 고속 나눗셈 알고리즘 (여러 몫 비트/단계) |
 | SSE (Streaming SIMD Extensions) | Streaming SIMD Extensions. x86 128-bit SIMD 확장 |
 | Strong Scaling | 문제 크기 고정, 프로세서 수 증가. Amdahl 적용→순차 부분이 한계. "같은 문제를 더 빨리" |
 | Weak Scaling | 프로세서에 비례하여 문제도 키움. 선형 확장 가능. "더 큰 문제를 같은 시간에" |
 | UMA (Uniform Memory Access) | Uniform Memory Access. 모든 프로세서 메모리 접근 시간 동일 |
 | VLIW (Very Long Instruction Word) | Very Long Instruction Word. 컴파일러가 여러 연산을 하나의 긴 명령어로 패킹 |
+| VA to PA (Virtual→Physical Address Translation) | CPU의 가상 주소를 물리 주소로 변환. Page Table로 VPN→PPN 매핑. TLB가 변환 캐싱. Page Offset은 그대로 유지 |
 | VMM (Virtual Machine Monitor) | Virtual Machine Monitor. 가상→물리 자원 매핑 (하이퍼바이저) |
 | WAN (Wide Area Network) | Wide Area Network. 광역 네트워크 (인터넷) |
 | Warp | GPU에서 32개 스레드의 그룹. SIMD 방식으로 동시 실행 (NVIDIA) |
