@@ -32,6 +32,15 @@
 | 64-bit, 4KB page → 64K TB | 64-bit page table 비현실성 | Ch11 |
 | Disk: seek 10~20ms + rotation 0~16ms + transfer 8~40μs | Disk 시간 (2012 기준) | Ch12 |
 | Flash: read 20μs / write 200μs / erase 2000μs | Flash 동작 시간 | Ch12 |
+| Path parsing: inode 2 (root) → directory 내용 → inumber → ... | Unix path → file 변환 | Ch13 |
+| 4.3 BSD inode: 12 direct + 1 indirect + 1 double-indirect | Multi-level indexed file | Ch14 |
+| 4KB block, 4B index → direct 48KB, indirect 4MB, double 4GB | 4.3 BSD 파일 크기 한계 | Ch14 |
+| DRAM vs Disk = 100,000배 (지구↔달) | File system 디자인의 동기 | Ch14 |
+| FFS bandwidth: 14~47% (vs S5FS 2~5%) | Disk awareness의 효과 | Ch14 |
+| LFS write bandwidth: 70% | Log-structured write 효율 | Ch14 |
+| 2TB drive ↔ 64MB bitmap | Free block bitmap 크기 | Ch14 |
+| 10% reserve (90% 이상 안 차게) | Seek optimization 트릭 | Ch14 |
+| Seek 예시: FCFS 269, SSTF 86, SCAN 169 | Disk scheduling 비교 | Ch14 |
 
 ---
 
@@ -230,6 +239,104 @@
 | **Interrupt + Blocking** | 효율적 | sleep | 일반 char device |
 | **Interrupt + Blocking + Buffer Cache** | 효율적 | 두 단계 sleep 가능 | block device 표준 |
 
+### File Redirection (Ch13) ★
+
+| 문법 | 의미 |
+|------|------|
+| `cmd < file` | stdin을 file에서 |
+| `cmd > file` | stdout을 file로 (덮어쓰기) |
+| `cmd >> file` | stdout을 file에 append |
+| `cmd 2> file` | stderr를 file로 |
+| `cmd1 \| cmd2` | cmd1 stdout → cmd2 stdin (pipe) |
+
+### Hard Link vs Symbolic Link (Ch13) ★
+
+| | Hard link | Symbolic link |
+|---|-----------|---------------|
+| 내용 | 같은 inode | target path string |
+| File system 제약 | 같은 FS만 | 다른 FS도 OK |
+| Directory 가능? | ✗ (cycle 위험) | ✓ |
+| Target 삭제 시 | 데이터 살아있음 (ref count) | dangling link |
+| 별도 inode | 없음 (공유) | 있음 |
+| 명령 | `ln file link` | `ln -s file link` |
+
+### File Access Patterns (Ch14) ★
+
+| 패턴 | 정의 | 예시 |
+|------|------|------|
+| **Sequential** | 순서대로 한 block씩 | text editor, compiler |
+| **Random** | 임의 순서로 직접 | demand paging, BST, DB |
+| **Keyed** | 특정 값 검색 | hash table (modern OS 미지원) |
+
+### 3가지 File Structure (Ch14) ★
+
+| 구조 | 핵심 | 장점 | 단점 |
+|------|------|------|------|
+| **Contiguous** | 시작 block# + size | seek 최적 | external fragmentation |
+| **Linked** | linked list of blocks | 확장 쉬움, no fragmentation | random access 불가 |
+| **Indexed** | pointer array of blocks | seq + random 둘 다 OK | max size 필요 |
+| **Multi-level (4.3 BSD)** | 12 direct + 1 indirect + 1 double | 작은 파일 빠름, 큰 파일 OK | 큰 파일은 extra access |
+
+### 3가지 Block Allocation (Ch14) ★
+
+| 방식 | 동작 | 장단점 |
+|------|------|--------|
+| **Contiguous** | 생성 시 한 번에 | 빠르지만 fragmentation |
+| **Block-based** | 사용 시 하나씩 | 효율적 공간, 많은 seek |
+| **Extent-based** | (start, size) range로 | seek 최적 + metadata 적음 (modern ext4) |
+
+### Free Block 추적 (Ch14) ★
+
+| 방법 | 동작 | 장단점 |
+|------|------|--------|
+| **Free list** | linked list of free blocks | 단순, scalability X (옛 Unix) |
+| **Bitmap** | 1 bit per block | 빠른 검색, fixed cost (modern) |
+
+### File System Cache 3가지 (Ch14) ★
+
+| 캐시 | 대상 | 핵심 |
+|------|------|------|
+| **Buffer cache** | 최근 접근 disk block | 같은 block 재사용 |
+| **Page cache** | disk에서 온 page | mmap, idle memory 활용 |
+| **Inode cache** | 최근 접근 inode | hash table, ref count |
+
+### Crash Consistency 도구 (Ch14) ★
+
+| 도구 | 시기 | 동작 |
+|------|------|------|
+| **fsck** | 부팅 시 | 전체 disk scan, metadata만 fix, 느림 |
+| **Journaling** | 매 op | write-ahead log, transaction 개념 |
+
+### Redo vs Undo Logging (Ch14) ★
+
+| | Redo | Undo |
+|---|------|------|
+| 핵심 | committed op 다시 적용 | uncommitted op 롤백 |
+| 로그 내용 | 변경 사항 | 원본 데이터 |
+| Checkpoint 시점 | TxnEnd 후 async | log 후 즉시 |
+| 사용 | ext3, ext4 | (이론) |
+
+### Unix File System Evolution (Ch14) ★
+
+| 시기 | FS | 핵심 |
+|------|-----|------|
+| 1974 | S5FS | 단순, 2~5% bandwidth |
+| 1984 | FFS | cylinder group, 14~47% bandwidth |
+| 1991 | LFS | append-only log, 70% write bandwidth |
+| 1993 | ext2 | FFS-like + fsck |
+| 1999 | ext3 | + journaling |
+| 2003 | ext4 | + checksum journaling + extent-based |
+
+### Disk Scheduling Algorithms (Ch14) ★
+
+| 알고리즘 | 핵심 | 특성 |
+|---------|------|------|
+| **FCFS** | 도착 순 | 많은 seek |
+| **SSTF** | nearest first | starvation 위험 |
+| **SCAN** | 엘리베이터 | balance |
+| **C-SCAN** | 한 방향만 (원형) | boundary fairness |
+| **LOOK** | C-SCAN 변형 | last req까지만 |
+
 ---
 
 ## ③ 용어 정의 모음
@@ -383,6 +490,74 @@
 - **Bottom half**: longer, interrupt enabled, deferred execution
 - **Polling vs Interrupt-driven**: 반복 검사 vs sleep + wake
 - **Blocking vs Non-blocking**: wait vs immediate return
+
+### 챕터 13: Files and Directories
+
+- **File**: named collection of bytes stored on storage (Unix 정의)
+- **"Everything is a file"** (Unix 철학): regular, directory, device, network 모두 file 인터페이스
+- **stdin / stdout / stderr**: fd 0/1/2, 모든 process에 기본 제공
+- **Redirection**: `<`, `>`, `>>`, `2>`, `|` — shell의 stdin/stdout 조작
+- **Directory**: 다른 file과 directory를 담는 special file
+- **Dentry (directory entry)**: directory 안의 (name, inumber) 쌍
+- **Subdirectory**: directory 안의 directory
+- **Pathname**: 절대(`/`로 시작) vs 상대(working dir 기준)
+- **Working directory (cwd)**: 각 process의 현재 디렉토리
+- **`.`, `..`, `/`**: 현재, 부모, root/구분자
+- **Inode (index node)**: file의 metadata (size, time, owner, protection, data block 위치)
+- **Inumber (ino)**: inode array의 index
+- **Root inumber**: 2 (0, 1은 special purpose)
+- **mkfs**: file system 생성 (`mkfs -t ext3 /dev/sdb1`)
+- **Mount**: 새 file system을 기존 tree의 directory에 attach
+- **Mount point**: mount되는 directory (새 FS의 root가 됨)
+- **Hard link**: 같은 inode를 가리키는 새 directory entry
+- **Symbolic (soft) link**: target file의 path string을 담은 별도 file
+- **Reference count**: inode 내 link 수 — 0 되면 실제 삭제
+- **Dangling link**: target이 사라진 symbolic link
+
+### 챕터 14: File System
+
+- **Superblock**: file system metadata block
+- **Inode blocks**: file metadata 저장
+- **Data blocks**: file 실제 데이터
+- **VFS (Virtual File System)**: Linux의 통합 FS 인터페이스 layer
+- **Sequential / Random / Keyed access**: 3가지 access pattern
+- **Contiguous file**: 시작 block + size만
+- **Linked file**: linked list of blocks
+- **Indexed file**: pointer array of blocks
+- **Multi-level indexed**: 4.3 BSD — 12 direct + indirect + double indirect
+- **Direct pointer**: 작은 파일용 (예: 12개)
+- **Indirect block**: pointer들의 block
+- **Double indirect**: indirect block 가리키는 block
+- **Contiguous allocation / Block-based / Extent-based**: 3가지 block 할당
+- **Extent**: 연속 block range, (start, size) 쌍
+- **Free list / Bitmap**: 2가지 free block 추적
+- **Buffer cache**: disk block 캐시
+- **Page cache**: disk page 캐시 (mmap과 통합)
+- **Inode cache**: inode 캐시 (hash table)
+- **Seek optimization**: 인접 block 배치 + 10% reserve
+- **Crash consistency**: power loss/crash 시 atomic update
+- **Data integrity**: disk corruption에도 데이터 같게
+- **fsck**: file system checker, 부팅 시 metadata 복구
+- **`lost+found`**: 고아 inode 보관 directory
+- **Journaling**: write-ahead log로 crash 복구
+- **Write-ahead logging**: DB에서 빌려옴, log 먼저 disk에
+- **Transaction (FS)**: file system 변경의 commit-or-abort 단위
+- **TxnBegin / TxnEnd**: transaction 경계 record
+- **Commit point**: no-turning-back 시점
+- **Checkpointing**: log의 변경을 in-place로 반영
+- **Redo logging**: committed op 다시 적용 (ext3/4 표준)
+- **Undo logging**: uncommitted op 롤백
+- **Checksum journaling**: log 내용에 checksum (ext4)
+- **S5FS** (1974): Ken Thomson, 옛 Unix FS
+- **FFS** (1984): Berkeley Fast FS, cylinder group, disk awareness
+- **LFS** (1991): Log-structured, append-only, 70% bandwidth
+- **Ext2/3/4**: Linux 표준 진화 (fsck → journaling → checksum)
+- **Cylinder group**: FFS의 관련 파일 grouping 단위
+- **Fragment**: FFS의 sub-block (작은 파일용)
+- **Rotational positioning (rotdelay)**: 다음 read 시 head가 도착하도록 interleave
+- **Disk scheduling**: I/O request queue 정렬
+- **FCFS, SSTF, SCAN, C-SCAN, LOOK**: scheduling 알고리즘
+- **SPTF (Shortest Positioning Time First)**: rotational 고려한 변형
 
 ### 보충: Transaction & ACID
 
@@ -979,6 +1154,195 @@ bdevsw[major] → driver의 file_operations
 
 **왜 분리?** 인터럽트가 빠르게 연속 발생할 때 ISR이 길면 시스템 응답성 저하. 짧은 ISR + 긴 bottom half로 분리하면 다른 인터럽트도 잘 처리.
 
+### 토픽 27: Path Name Parsing (Ch13)
+
+**`/a/b/c` 같은 path가 어떻게 disk의 데이터가 되는가**
+
+```
+   Inode 2 (root):  Contains <"a", 5>
+        ↓
+   Inode 5 (dir):   Contains <"b", 7>
+        ↓
+   Inode 7 (dir):   Contains <"c", 14>
+        ↓
+   Inode 14 (file): 실제 데이터
+```
+
+**핵심**:
+- **Root inumber = 2** (0, 1은 special)
+- Directory = `(name, inumber)` 쌍들을 담은 **special file**
+- Path parsing = **재귀적 inode lookup**
+- 깊은 path = 더 많은 disk read → dentry cache로 최적화
+
+### 토픽 28: Hard Link vs Symbolic Link (Ch13)
+
+**Hard link** — 같은 inode 공유:
+```bash
+$ ln file file_link
+$ ls -i file file_link
+671158084 file
+671158084 file_link    # 같은 inode!
+```
+
+**삭제 동작**:
+- 각 inode에 **reference count**
+- `rm`은 directory entry만 제거 + count 감소
+- **count == 0 되어야 실제 데이터 해제**
+
+**Symbolic link** — target path를 담은 별도 file:
+```bash
+$ ln -s file file_link
+$ stat file_link
+symbolic link
+```
+
+**차이점**:
+- Hard: same FS only, no dir, no dangling
+- Symbolic: cross-FS, dir OK, **dangling 가능**
+
+### 토픽 29: Mount의 동작 (Ch13)
+
+```bash
+$ mkfs -t ext3 /dev/sdb1
+$ mount -t ext3 /dev/sdb1 /home/users
+```
+
+```
+   Mount 전:                       Mount 후:
+   /                              /
+   ├── home                      ├── home
+   │   ├── users (빈)            │   ├── users  ← 새 FS의 root!
+   │                                  │       ├── ...
+   └── ...                            └── ...
+```
+
+**핵심 통찰**: 컴퓨터의 여러 file system이 **사용자에게는 하나의 통합 tree**처럼 보임.
+
+### 토픽 30: 4.3 BSD Multi-level Indexed File (Ch14) ★
+
+**4 KB block, 4 B index 가정**:
+
+```
+   Inode:
+   ┌──────────────────┐
+   │ Attributes        │
+   ├──────────────────┤
+   │ Direct 0~11      │──→ Data Block (12개)
+   ├──────────────────┤
+   │ Indirect         │──→ Indirect Block (1024 pointers)
+   │                    │     └→ Data Block × 1024
+   ├──────────────────┤
+   │ Double Indirect  │──→ Block of 1024 indirect blocks
+   │                    │     └→ 1024 × 1024 = 1M Data Blocks
+   └──────────────────┘
+```
+
+**파일 크기 한계**:
+- Direct: 12 × 4KB = **48 KB**
+- + Indirect: 1024 × 4KB = **4 MB**
+- + Double indirect: 1M × 4KB = **4 GB**
+- + Triple indirect (있다면): 1G × 4KB = **4 TB**
+
+**Trade-off**:
+- 작은 파일 (< 48KB): inode 한 번 → 데이터 바로 (빠름)
+- 큰 파일: 2~3번 추가 inode access
+
+### 토픽 31: Extent-based Allocation (Ch14)
+
+**Extent** = 연속 block range, **(start, size) 쌍**으로 압축.
+
+```
+   Inode:
+   ┌──────────────────┐
+   │ Extent 0: [100, 10] │  ← Block 100~109
+   │ Extent 1: [200, 7]  │  ← Block 200~206
+   │ Extent 2: [350, 7]  │  ← Block 350~356
+   └──────────────────┘
+```
+
+**장점**:
+- Sequential 효율 (연속 block)
+- **Metadata 작음** (큰 파일도 몇 개의 extent만)
+- 큰 physical write 가능
+
+**사용**: Linux ext4, VxFS, QFS.
+
+### 토픽 32: Journaling — Write-Ahead Logging (Ch14) ★
+
+**Transaction의 commit-or-abort 의미를 file system에**:
+
+```
+   1. TxnBegin write (async, 고유 ID)
+   2. File system 변경 사항 write
+      ⌐ TxnBegin + 변경사항이 disk에 있어야 다음
+   3. TxnEnd write
+      └ disk에 TxnEnd 완료 = transaction committed
+   4. Checkpoint: 실제 file system 변경 적용 (async)
+```
+
+**Crash Recovery**:
+1. Log scan
+2. TxnBegin → TxnEnd 매칭
+3. 둘 다 있으면 (committed) → 변경 적용
+4. TxnEnd 없으면 (uncommitted) → 무시
+
+**ext3 vs ext4**:
+- ext3: synchronous log write → 느림
+- **ext4: checksum journaling** → log 전체 한 번에 write, recovery 시 checksum 검증
+
+### 토픽 33: FFS의 Cylinder Group (Ch14) ★
+
+**FFS의 Key idea: "Keep related stuff together!"**
+
+```
+   FFS Partition:
+   ┌──────────┬──────────┬───────────────┬───────────────┬───────────────┐
+   │ Boot     │ Super-   │ Cylinder Group │ Cylinder Group │ Cylinder Group │
+   │          │ block    │                │                │                │
+   └──────────┴──────────┴───────────────┴───────────────┴───────────────┘
+```
+
+각 cylinder group:
+```
+   ┌──────┬──────────┬──────────┬───────┬─────────────┐
+   │ S/B  │ Inode    │ Data     │Inodes │ Data Blocks │
+   │      │ Bitmap   │ Bitmap   │       │              │
+   └──────┴──────────┴──────────┴───────┴─────────────┘
+```
+
+**할당 규칙**:
+- 한 directory의 파일 inode들을 **같은 group에**
+- 새 directory는 **부모와 다른 group에** (분산)
+- 파일 data block은 **inode와 같은 group에**
+
+**큰 파일 처리**:
+- 처음 12 block: 한 group
+- **48 KB부터 group 변경** (direct pointer 다 채워서)
+- **매 1 MB마다** 또 group 변경 (한 group을 독점하지 않게)
+
+**효과**: S5FS의 2% bandwidth → **FFS의 14~47%**.
+
+### 토픽 34: Disk Scheduling 비교 (Ch14) ★
+
+**예시**: Cylinder 0, 53, 14, 27, 2, 31, 85, 30 요청. Head 초기 = 1.
+
+| 알고리즘 | 처리 순서 | Total seek |
+|---------|----------|-----------|
+| FCFS | 0, 53, 14, 27, 2, 31, 85, 30 | **269** |
+| SSTF | 0, 2, 14, 27, 30, 31, 53, 85 | **86** |
+| SCAN | 2, 14, 27, 30, 31, 53, 85, 0 | **169** |
+| C-SCAN | 2, 14, 27, 30, 31, 53, 85, 0 | **169** |
+
+**Trade-off**:
+- **SSTF**: 가장 빠르지만 **starvation 위험** (멀리 있는 request)
+- **SCAN (elevator)**: 한 방향씩 왕복, balance
+- **C-SCAN**: 한 방향만, 끝에서 시작점으로 jump → boundary fairness
+
+**Modern**:
+- **LOOK**: C-SCAN 변형, last request까지만 이동
+- **SPTF/SATF**: rotational latency도 고려
+- **Flash**: mechanical seek 없음 → 다른 전략 (wear leveling 등)
+
 ---
 
 ## ⑤ 시험 직전 체크리스트
@@ -1124,6 +1488,45 @@ bdevsw[major] → driver의 file_operations
 - [ ] Blocking vs Non-blocking trade-off
 - [ ] Block device의 interrupt-driven blocking 흐름 (2단계 sleep)
 
+### 챕터 13: Files and Directories
+- [ ] Unix의 file 정의 + "everything is a file" 철학
+- [ ] stdin/stdout/stderr와 fd 0/1/2
+- [ ] Redirection 5가지 (`<`, `>`, `>>`, `2>`, `|`)
+- [ ] Directory가 (name, inumber) 쌍을 담은 special file
+- [ ] Inode vs inumber 구분
+- [ ] Root의 inumber = 2 (0,1은 special)
+- [ ] Path parsing 단계: `/a/b/c` 추적
+- [ ] Absolute vs relative pathname
+- [ ] Working directory와 locality
+- [ ] mkfs와 mount의 동작
+- [ ] Mount point 개념
+- [ ] Hard link vs Symbolic link 차이 (5가지 이상)
+- [ ] Reference count의 역할 (`rm`이 실제로 하는 일)
+- [ ] Dangling symbolic link
+
+### 챕터 14: File System
+- [ ] File system이 순수 software인 이유
+- [ ] 4가지 view (user/kernel/FS/driver)와 사이의 mapping
+- [ ] DRAM vs Disk 100,000배 격차 (지구↔달)
+- [ ] 3가지 access pattern (sequential/random/keyed)
+- [ ] 3가지 file structure 장단점
+- [ ] **4.3 BSD 12 direct + 1 indirect + 1 double** 파일 크기 계산
+- [ ] 3가지 block allocation (contiguous/block-based/**extent**)
+- [ ] Free list vs Bitmap (옛 Unix → modern)
+- [ ] Buffer/Page/Inode cache 3가지 차이
+- [ ] **10% reserve** 트릭
+- [ ] Crash inconsistency 3가지 case
+- [ ] fsck의 한계 (느림, metadata만, sync write)
+- [ ] Journaling의 write-ahead logging
+- [ ] Redo vs Undo logging 차이
+- [ ] ext3 vs ext4 (checksum journaling)
+- [ ] S5FS → FFS → LFS → ext2/3/4 진화 + 각 핵심
+- [ ] FFS cylinder group + fragment + rotdelay
+- [ ] LFS의 append-only sequential write
+- [ ] **Disk scheduling 예시 (FCFS 269, SSTF 86, SCAN 169)**
+- [ ] SSTF starvation 문제
+- [ ] SCAN vs C-SCAN 차이
+
 ### 보충: ACID
 - [ ] Transaction의 정의
 - [ ] ACID 4가지 의미 + 예시
@@ -1144,5 +1547,12 @@ bdevsw[major] → driver의 file_operations
 - **Ch9 (heap)** → **Ch11 (demand paging)**: AMO가 anonymous mmap
 - **Ch10 (paging)** → **Ch11 (demand paging)**: paging의 valid bit 활용
 - **Ch11 (demand paging)** → **Ch12 (device driver)**: page fault 시 disk driver 호출
+- **Ch9 (heap)** → **Ch13 (link)**: reference counter는 hard link와 같은 원리
+- **Ch12 (device driver)** → **Ch13 (file system)**: device file(`/dev/...`)이 driver와 FS의 다리
+- **Ch13 (files/dirs)** → **Ch14 (file system)**: 추상화의 구현. inode가 실제로 어떻게 disk에
+- **Ch9 (heap)** → **Ch14 (free block)**: 둘 다 free list/bitmap으로 추적 (같은 패턴)
+- **Ch11 (page cache)** → **Ch14 (page cache)**: mmap이 FS와 VM 통합
+- **Ch12 (buffer cache)** → **Ch14 (buffer cache)**: block device driver의 buffer cache 동일
+- **ACID 보충** → **Ch14 (journaling)**: transaction의 ACID를 file system에 적용
 
 ---
